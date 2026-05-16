@@ -1,0 +1,103 @@
+import type { ChallengeConfig, RunPoint } from "../types";
+
+const EARTH_RADIUS_M = 6_371_000;
+
+export function toRadians(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+export function haversineDistanceMeters(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+): number {
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const deltaLat = toRadians(b.lat - a.lat);
+  const deltaLng = toRadians(b.lng - a.lng);
+
+  const h =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+
+  return 2 * EARTH_RADIUS_M * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+export function averagePoint(points: RunPoint[]): RunPoint | null {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const average = points.reduce(
+    (acc, point) => ({
+      lat: acc.lat + point.lat,
+      lng: acc.lng + point.lng,
+      altitudeM: acc.altitudeM + (point.altitudeM ?? 0),
+      altitudeCount: acc.altitudeCount + (point.altitudeM === null ? 0 : 1),
+      accuracyM: acc.accuracyM + point.accuracyM
+    }),
+    { lat: 0, lng: 0, altitudeM: 0, altitudeCount: 0, accuracyM: 0 }
+  );
+
+  const first = points[0];
+  return {
+    ...first,
+    lat: average.lat / points.length,
+    lng: average.lng / points.length,
+    altitudeM: average.altitudeCount > 0 ? average.altitudeM / average.altitudeCount : null,
+    accuracyM: average.accuracyM / points.length
+  };
+}
+
+export function stableEdgePoint(points: RunPoint[], edge: "start" | "end"): RunPoint | null {
+  const goodPoints = points.filter((point) => point.accuracyM <= 30);
+  const source = goodPoints.length >= 3 ? goodPoints : points;
+  const edgePoints = edge === "start" ? source.slice(0, 5) : source.slice(-5);
+  return averagePoint(edgePoints);
+}
+
+export function calculateRouteDistance(points: RunPoint[]): number {
+  return points.reduce((distance, point, index) => {
+    const previous = points[index - 1];
+    if (!previous) {
+      return distance;
+    }
+
+    return distance + haversineDistanceMeters(previous, point);
+  }, 0);
+}
+
+export function estimateStepsFromPosition(point: RunPoint | null, config: ChallengeConfig): number {
+  if (!point) {
+    return 0;
+  }
+
+  const start = { lat: config.startLat, lng: config.startLng };
+  const end = { lat: config.endLat, lng: config.endLng };
+  const routeDistance = haversineDistanceMeters(start, end);
+  const fromStart = haversineDistanceMeters(start, point);
+  const toEnd = haversineDistanceMeters(point, end);
+  const alongRouteProgress = Math.max(0, Math.min(1, (routeDistance + fromStart - toEnd) / (2 * routeDistance)));
+
+  return Math.round(alongRouteProgress * config.totalSteps);
+}
+
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+export function formatPace(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) {
+    return "–";
+  }
+
+  return `${formatDuration(seconds)} / 100 Stufen`;
+}
