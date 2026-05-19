@@ -1,5 +1,5 @@
 import { Download, Flag, LocateFixed, Map, Mountain, Share2, ShieldCheck, Timer } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
@@ -60,7 +60,7 @@ export function ResultPage() {
           <p><ShieldCheck /> Prüfungsdetails <span>{run.validationReasons.join(" ")}</span></p>
         </GlassPanel>
         <ValidationBadge status={run.status} />
-        <Button>In Rangliste eintragen</Button>
+        <Link to="/leaderboard"><Button>In Rangliste ansehen</Button></Link>
         <Button variant="secondary" icon={<Share2 />}>Bericht teilen</Button>
         <Button variant="glass" icon={<Download />} onClick={exportJson}>JSON exportieren</Button>
       </section>

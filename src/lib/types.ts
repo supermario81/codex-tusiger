@@ -62,7 +62,9 @@ export type Profile = {
   userId: string;
   nickname: string;
   avatarUrl: string;
+  language: "de" | "en";
   role: "user" | "admin";
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -86,14 +88,27 @@ export type Group = {
   isPrivate: boolean;
   memberCount: number;
   bestTimeSeconds: number | null;
+  role?: "owner" | "admin" | "member";
 };
 
 export type HistoryItem = {
   id: string;
+  slug?: string;
+  language?: "de" | "en";
   sortOrder: number;
   yearLabel: string;
   title: string;
   body: string;
+};
+
+export type LegalPage = {
+  id: string;
+  slug: string;
+  language: "de" | "en";
+  title: string;
+  body: string;
+  version: string;
+  active: boolean;
 };
 
 export type MotivationMessage = {

@@ -1,4 +1,4 @@
-import { LogOut, Settings, Trophy } from "lucide-react";
+import { History, LogOut, Settings, Trophy, UsersRound } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
@@ -25,6 +25,14 @@ export function ProfilePage() {
           <p>Rookie · Öffentlich sichtbar</p>
           <span className="status-badge status-valid"><Trophy size={16} /> {best ? formatDuration(best.durationSeconds) : "Noch keine Zeit"}</span>
         </GlassPanel>
+        <GlassPanel className="run-history-list">
+          <h2>Lauf-History</h2>
+          {runs.length === 0 ? <p>Noch keine Läufe gespeichert.</p> : runs.slice(0, 5).map((run) => (
+            <p key={run.id}>{new Date(run.startedAt).toLocaleDateString("de-CH")} <strong>{formatDuration(run.durationSeconds)}</strong> <span>{run.status}</span></p>
+          ))}
+        </GlassPanel>
+        <Link className="action-row" to="/groups"><UsersRound /> Gruppen</Link>
+        <Link className="action-row" to="/history"><History /> Geschichte</Link>
         <Link className="action-row" to="/settings"><Settings /> Datenschutz & Einstellungen</Link>
         <Button variant="secondary" onClick={logout} icon={<LogOut />}>Logout</Button>
       </section>

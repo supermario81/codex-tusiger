@@ -1,4 +1,4 @@
-import { BarChart3, Heart, Home, UsersRound, UserRound } from "lucide-react";
+import { BarChart3, BookHeart, Home, UsersRound, UserRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -6,7 +6,7 @@ const items = [
   { to: "/leaderboard", label: "Rangliste", icon: BarChart3 },
   { to: "/groups", label: "Gruppen", icon: UsersRound },
   { to: "/profile", label: "Profil", icon: UserRound },
-  { to: "/donate", label: "Spenden", icon: Heart }
+  { to: "/history", label: "Geschichte", icon: BookHeart }
 ];
 
 export function BottomNav() {

@@ -13,7 +13,7 @@ npm run dev
 
 Vite öffnet die App standardmäßig auf http://localhost:5173.
 
-Ohne Supabase-Konfiguration läuft die App automatisch im sicheren Demo-Modus.
+Ohne Supabase-Konfiguration zeigt die App eine klare Setup-Meldung. Für echte Logins, Läufe, Gruppen und Ranglisten brauchst du den Supabase Anon Key.
 
 ## Scripts
 
@@ -33,9 +33,8 @@ npm run build
 5. `.env.example` nach `.env.local` kopieren:
 
 ```bash
-VITE_SUPABASE_URL=https://dein-projekt.supabase.co
+VITE_SUPABASE_URL=https://gmbtkmorvretjwaegkln.supabase.co
 VITE_SUPABASE_ANON_KEY=dein-anon-key
-VITE_DEMO_MODE=false
 ```
 
 Wichtig: Niemals den Supabase Service Role Key im Frontend oder in GitHub committen.
@@ -47,10 +46,35 @@ Der Workflow `.github/workflows/deploy.yml` baut und deployed `dist` nach GitHub
 In GitHub hinterlegen:
 
 - Repository Settings -> Pages -> Source: GitHub Actions
-- Secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-- Optional Variable: `VITE_DEMO_MODE=false`
+- Secrets: `VITE_SUPABASE_ANON_KEY`
+- Optional Secret: `VITE_SUPABASE_URL`, falls ein anderes Projekt genutzt wird
 
-Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitHub-Actions-Build.
+Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitHub-Actions-Build. Die App verwendet `HashRouter`, damit Reloads und Deep Links auf GitHub Pages funktionieren, z. B. `/#/join/CODE`.
+
+## Supabase Migration
+
+Führe `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Die Migration erstellt:
+
+- Profile, Läufe, GPS-Punkte, Gruppen, History, Legal Pages, Analytics und Audit Logs
+- RLS Policies
+- `avatars` Storage Bucket
+- `leaderboard_public` View
+- Seed-Daten für Challenge Config, Geschichte und Legal-Entwürfe
+
+Legal-Texte sind ausdrücklich als Entwürfe markiert und müssen juristisch geprüft werden.
+
+## Donation / TWINT Assets
+
+Die App erstellt keine Zahlungen und empfängt keine Spenden. Die Spende geht direkt an die zuständige freiwillige Arbeitsgruppe / Born Rangers Team.
+
+Lege die offiziellen Flyer-Dateien in `public/images/` ab:
+
+```text
+public/images/twint-1000er-staegli.jpg
+public/images/flyer-1000er-staegli.jpg
+```
+
+Kein QR-Code wird künstlich generiert.
 
 ## iPhone PWA
 
@@ -62,11 +86,11 @@ Enthalten:
 
 - React + Vite + TypeScript
 - PWA Manifest und Service Worker via `vite-plugin-pwa`
-- Supabase Auth, DB- und Storage-Vorbereitung
+- Supabase Auth, DB- und Storage-Integration
 - GPS-basierte Run-Erfassung mit Reload-Schutz
 - Offline-Zwischenspeicherung aktiver Läufe
 - Validierungslogik mit Tests
-- Demo-Modus ohne echte Keys
+- first-party Analytics Events in Supabase
 
 ## iPhone/Safari Hinweise
 

@@ -1,17 +1,22 @@
 import { CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { Avatar } from "../../components/ui/Avatar";
 import { GlassPanel } from "../../components/ui/Card";
-import { demoLeaderboard } from "../../data/challenge";
 import { formatDuration } from "../../lib/geo/geo";
+import { filterLeaderboardByTab } from "../../lib/community/community";
 
 const tabs = ["Heute", "Woche", "Monat", "Gesamt"];
 
 export function LeaderboardPage() {
   const [active, setActive] = useState("Heute");
-  const podium = demoLeaderboard.slice(0, 3);
-  const rows = demoLeaderboard.slice(3);
+  const { leaderboard, trackEvent } = useApp();
+  const filtered = filterLeaderboardByTab(leaderboard, active as "Heute" | "Woche" | "Monat" | "Gesamt");
+  const source = filtered.length > 0 ? filtered : leaderboard;
+  const podium = source.slice(0, 3);
+  const rows = source.slice(3);
+  void trackEvent("leaderboard_viewed", { tab: active });
 
   return (
     <PageShell>
@@ -38,6 +43,7 @@ export function LeaderboardPage() {
           ))}
         </GlassPanel>
         <GlassPanel className="leaderboard-list">
+          {source.length === 0 ? <p className="empty-state">Noch keine gültigen Läufe in der Rangliste.</p> : null}
           {rows.map((run) => (
             <article key={run.id} className={run.isCurrentUser ? "current-user" : ""}>
               <b>{run.rank}</b>

@@ -1,4 +1,4 @@
-import type { ChallengeConfig, HistoryItem, MotivationMessage, PublicRun } from "../lib/types";
+import type { ChallengeConfig, HistoryItem, LegalPage, MotivationMessage, PublicRun } from "../lib/types";
 
 export const defaultChallengeConfig: ChallengeConfig = {
   id: "tusiger-default",
@@ -42,24 +42,82 @@ export const motivationMessages: MotivationMessage[] = [
 export const historyFallback: HistoryItem[] = [
   {
     id: "history-2021",
+    slug: "1904",
     sortOrder: 1,
-    yearLabel: "2021",
-    title: "Die Idee entsteht",
-    body: "Eine Challenge unter Freunden wird zur Herzensmission."
+    yearLabel: "1904",
+    title: "Inbetriebnahme",
+    body: "Inbetriebnahme der Druckleitung und der Borntreppe."
   },
   {
     id: "history-2022",
+    slug: "1960",
     sortOrder: 2,
-    yearLabel: "2022",
-    title: "Gemeinschaft wächst",
-    body: "Immer mehr Menschen finden zusammen und gehen gemeinsam den Weg."
+    yearLabel: "1960",
+    title: "Rückbau",
+    body: "Rückbau der Druckleitung und beginnender Zerfall der Treppe."
   },
   {
-    id: "history-today",
+    id: "history-1986",
+    slug: "1986",
     sortOrder: 3,
-    yearLabel: "Heute",
-    title: "1000 Stufen. Jeden Tag.",
-    body: "Tausende Schritte. Unzählige Geschichten. Ein Ziel: besser werden, zusammen."
+    yearLabel: "1986",
+    title: "Neuerstellung",
+    body: "Neuerstellung des Stäglis durch den Aarburger Initianten Herbert Scheidegger, kurz «Born-Hörbi» genannt."
+  },
+  {
+    id: "history-1987-open",
+    slug: "1987",
+    sortOrder: 4,
+    yearLabel: "1987",
+    title: "Eröffnung",
+    body: "Eröffnung des Stäglis, heute 1150 Stufen."
+  },
+  {
+    id: "history-1987-care",
+    slug: "1987-unterhalt",
+    sortOrder: 5,
+    yearLabel: "1987",
+    title: "Unterhalt durch Freiwillige",
+    body: "Beginn mit dem Unterhalt durch Freiwillige."
+  }
+];
+
+export const legalFallback: LegalPage[] = [
+  {
+    id: "privacy-de",
+    slug: "datenschutz",
+    language: "de",
+    title: "Datenschutzrichtlinie",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Entwurf, rechtlich zu prüfen. Betreiber: Mario Martic / seven-art.com, Riedtalstrasse 14a, 4800 Zofingen, Schweiz, mario@seven-art.com. Die App verarbeitet E-Mail zur Anmeldung, öffentliche Profilangaben, GPS-Punkte während aktiver Läufe, Gruppenmitgliedschaften und erste eigene Analytics-Events. E-Mail-Adressen werden nicht öffentlich angezeigt."
+  },
+  {
+    id: "terms-de",
+    slug: "nutzungsbedingungen",
+    language: "de",
+    title: "Nutzungsbedingungen",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Entwurf, rechtlich zu prüfen. Tusiger ist ein privates Herzprojekt. Die Nutzung erfolgt freiwillig. Sportliche Aktivitäten erfolgen auf eigene Verantwortung."
+  },
+  {
+    id: "imprint-de",
+    slug: "impressum",
+    language: "de",
+    title: "Impressum",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Mario Martic / seven-art.com, Riedtalstrasse 14a, 4800 Zofingen, Schweiz. E-Mail: mario@seven-art.com. Telefon: 076 572 20 81."
+  },
+  {
+    id: "sensors-de",
+    slug: "standort-sensoren",
+    language: "de",
+    title: "Standort- und Sensor-Einwilligung",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Entwurf, rechtlich zu prüfen. Standortdaten werden erst nach Nutzeraktion im Pre-Run und während eines aktiven Laufs verwendet. Safari kann Höhenwerte ungenau oder gar nicht liefern."
   }
 ];
 

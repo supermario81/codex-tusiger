@@ -12,10 +12,11 @@ import { Input } from "../../components/ui/Input";
 const blockedNicknames = ["admin", "null", "undefined", "test"];
 
 export function ProfileSetupPage() {
-  const { profile, saveProfile } = useApp();
+  const { profile, saveProfile, uploadAvatar } = useApp();
   const navigate = useNavigate();
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl ?? "");
+  const [language, setLanguage] = useState<"de" | "en">(profile?.language ?? "de");
   const [error, setError] = useState("");
   const [uploadState, setUploadState] = useState("");
 
@@ -40,13 +41,14 @@ export function ProfileSetupPage() {
       return;
     }
 
-    setUploadState("Avatar wird vorbereitet...");
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      setAvatarUrl(String(reader.result));
+    setUploadState("Avatar wird hochgeladen...");
+    uploadAvatar(file).then((url) => {
+      setAvatarUrl(url);
       setUploadState("Avatar bereit.");
+    }).catch((cause) => {
+      setError(cause instanceof Error ? cause.message : "Avatar konnte nicht hochgeladen werden.");
+      setUploadState("");
     });
-    reader.readAsDataURL(file);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -56,8 +58,8 @@ export function ProfileSetupPage() {
       setError("Nickname braucht 3–20 Zeichen und darf kein Platzhalter sein.");
       return;
     }
-    await saveProfile({ nickname: nickname.trim(), avatarUrl });
-    navigate("/pre-run");
+    await saveProfile({ nickname: nickname.trim(), avatarUrl, language });
+    navigate("/");
   }
 
   return (
@@ -85,6 +87,10 @@ export function ProfileSetupPage() {
             onChange={(event) => setNickname(event.currentTarget.value)}
           />
           <p className="helper-line"><Globe2 size={18} /> Öffentlich sichtbar in der Rangliste</p>
+          <div className="segmented language-switch">
+            <button className={language === "de" ? "active" : ""} type="button" onClick={() => setLanguage("de")}>Deutsch</button>
+            <button className={language === "en" ? "active" : ""} type="button" onClick={() => setLanguage("en")}>English</button>
+          </div>
           {uploadState ? <p className="helper-line">{uploadState}</p> : null}
         </GlassPanel>
         <Button disabled={!isValid}>Weiter</Button>
