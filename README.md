@@ -52,7 +52,7 @@ In GitHub hinterlegen:
 
 Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitHub-Actions-Build. Die App verwendet `HashRouter`, damit Reloads und Deep Links auf GitHub Pages funktionieren, z. B. `/#/join/CODE`.
 
-## Supabase Auth URL und E-Mail-Code
+## Supabase Auth Setup
 
 In Supabase unter Authentication -> URL Configuration:
 
@@ -64,36 +64,49 @@ In Supabase unter Authentication -> URL Configuration:
 
 Wenn die Login-Mail auf `localhost:3000` zeigt, ist die Supabase Site URL noch falsch gesetzt.
 
-Damit in der Mail ein 6-stelliger Code sichtbar ist, passe unter Authentication -> Email Templates -> Magic Link den Text an und füge `{{ .Token }}` ein. Der Link bleibt zusätzlich über `{{ .ConfirmationURL }}` möglich.
+In Supabase unter Authentication -> Sign In / Providers -> Email:
 
-Deutsche MVP-Vorlage:
+- Email provider: enabled
+- Confirm email: enabled
+- Secure email change: enabled
+- Double confirm email changes: enabled
+
+Der erste E-Mail-OTP-Login bestätigt die Adresse und erstellt den Auth-User. Es braucht keinen separaten zweiten Double-Opt-in-Schritt.
+
+Supabase nutzt je nach Zustand der Adresse unterschiedliche Templates:
+
+- neue Adresse: `Confirm sign up`
+- bestehende Adresse: `Magic link or OTP`
+
+Beide Templates müssen denselben Code-only-Inhalt bekommen, sonst erhältst du einmal einen Link und einmal einen Code.
+
+Code-only-Vorlage für `Confirm sign up` und `Magic link or OTP`:
 
 ```html
 <h2>Dein Tusiger Login-Code</h2>
 
 <p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
 
-<p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{{ .Token }}</p>
+<p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
 
-<p>Alternativ kannst du dich direkt über diesen Link anmelden:</p>
-<p><a href="{{ .ConfirmationURL }}">Bei Tusiger einloggen</a></p>
+<p>Wenn du diese Anmeldung nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
 ```
 
-Mehrsprachige Vorlage mit `user_metadata.language`:
+Wichtig: Für Code-Login keinen `{{ .ConfirmationURL }}`-Link in diesen Templates verwenden. One-Time-Links können durch Webmail-Preview, Security-Scanner oder versehentliches Öffnen verbraucht werden.
+
+Mehrsprachige Code-only-Vorlage für beide Templates:
 
 ```html
 {{ if eq .Data.language "en" }}
   <h2>Your Tusiger sign-in code</h2>
   <p>Enter this code in the Tusiger app. It expires shortly and can only be used once.</p>
-  <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{{ .Token }}</p>
-  <p>Or sign in directly with this link:</p>
-  <p><a href="{{ .ConfirmationURL }}">Sign in to Tusiger</a></p>
+  <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
+  <p>If you did not request this sign-in, you can ignore this email.</p>
 {{ else }}
   <h2>Dein Tusiger Login-Code</h2>
   <p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
-  <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{{ .Token }}</p>
-  <p>Alternativ kannst du dich direkt über diesen Link anmelden:</p>
-  <p><a href="{{ .ConfirmationURL }}">Bei Tusiger einloggen</a></p>
+  <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
+  <p>Wenn du diese Anmeldung nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
 {{ end }}
 ```
 
@@ -110,6 +123,10 @@ Führe zuerst `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Edit
 - Seed-Daten für Challenge Config, Geschichte und Legal-Entwürfe
 
 Legal-Texte sind ausdrücklich als Entwürfe markiert und müssen juristisch geprüft werden.
+
+## Testdaten Zurücksetzen
+
+Für einen sauberen Auth-Test kann `supabase/reset/clear_test_users.sql` im Supabase SQL Editor ausgeführt werden. Das löscht alle Profile, Läufe, Gruppen, Analytics, Avatar-Dateien und Auth-User. Nur in Test/Staging verwenden.
 
 ## Donation / TWINT Assets
 
