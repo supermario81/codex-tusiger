@@ -288,6 +288,44 @@ h2 { color: var(--deep); letter-spacing: 0; }
 form { display: grid; gap: 16px; }
 .auth-page .glass-panel { padding: 20px; }
 .auth-page > h1, .auth-page > p { text-align: center; margin-bottom: 0; }
+.sent-panel {
+  justify-items: center;
+  text-align: center;
+}
+.sent-panel h2,
+.sent-panel p {
+  margin: 0;
+}
+.sent-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  background: linear-gradient(135deg, var(--sage), var(--leaf));
+  box-shadow: 0 14px 32px rgba(52,78,65,.2);
+}
+.sent-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.text-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--forest);
+  font: inherit;
+  font-weight: 800;
+}
+.text-button svg {
+  width: 18px;
+  height: 18px;
+}
 .otp-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
 .otp-row span {
   min-height: 58px;

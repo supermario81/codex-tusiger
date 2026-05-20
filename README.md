@@ -52,6 +52,20 @@ In GitHub hinterlegen:
 
 Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitHub-Actions-Build. Die App verwendet `HashRouter`, damit Reloads und Deep Links auf GitHub Pages funktionieren, z. B. `/#/join/CODE`.
 
+## Supabase Auth URL und E-Mail-Code
+
+In Supabase unter Authentication -> URL Configuration:
+
+- Site URL: `https://supermario81.github.io/codex-tusiger/`
+- Redirect URLs:
+  - `https://supermario81.github.io/codex-tusiger/**`
+  - `http://localhost:5173/**`
+  - `http://localhost:5174/**`
+
+Wenn die Login-Mail auf `localhost:3000` zeigt, ist die Supabase Site URL noch falsch gesetzt.
+
+Damit in der Mail ein 6-stelliger Code sichtbar ist, passe unter Authentication -> Email Templates -> Magic Link den Text an und füge `{{ .Token }}` ein. Der Link bleibt zusätzlich über `{{ .ConfirmationURL }}` möglich.
+
 ## Supabase Migration
 
 Führe zuerst `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Danach führe `supabase/migrations/0002_public_grants.sql` aus. Die Migrationen erstellen:

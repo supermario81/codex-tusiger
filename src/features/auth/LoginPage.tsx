@@ -1,4 +1,4 @@
-import { LockKeyhole, Send } from "lucide-react";
+import { ArrowLeft, LockKeyhole, MailCheck, Send } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
@@ -36,6 +36,12 @@ export function LoginPage() {
     }
   }
 
+  function changeEmail() {
+    setSent(false);
+    setOtp("");
+    setError("");
+  }
+
   async function login(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -58,27 +64,34 @@ export function LoginPage() {
         <h1>Willkommen zurück</h1>
         <p>Melde dich mit E-Mail an</p>
         {setupError ? <GlassPanel className="setup-warning"><strong>Setup fehlt</strong><p>{setupError}</p></GlassPanel> : null}
-        <div className="segmented">
-          <button className="active" type="button">E-Mail</button>
-          <button type="button" disabled>Mobile später</button>
-        </div>
-        <GlassPanel>
-          <form onSubmit={sendCode}>
-            <Input
-              value={email}
-              inputMode="email"
-              placeholder="Deine E-Mail-Adresse"
-              onChange={(event) => setEmail(event.currentTarget.value)}
-            />
-            <Button disabled={loading} icon={<Send />}>
-              {loading ? "Sende..." : "Code senden"}
-            </Button>
-          </form>
-        </GlassPanel>
+        {!sent ? (
+          <GlassPanel>
+            <form onSubmit={sendCode}>
+              <Input
+                value={email}
+                inputMode="email"
+                placeholder="Deine E-Mail-Adresse"
+                onChange={(event) => setEmail(event.currentTarget.value)}
+              />
+              <Button disabled={loading} icon={<Send />}>
+                {loading ? "Sende..." : "Code senden"}
+              </Button>
+            </form>
+          </GlassPanel>
+        ) : (
+          <GlassPanel className="sent-panel">
+            <div className="sent-icon"><MailCheck /></div>
+            <h2>Code ist unterwegs</h2>
+            <p>Wir haben eine E-Mail an <strong>{email}</strong> gesendet. Gib den 6-stelligen Code ein oder nutze den Login-Link.</p>
+            <button className="text-button" type="button" onClick={changeEmail}>
+              <ArrowLeft /> E-Mail ändern
+            </button>
+          </GlassPanel>
+        )}
         <GlassPanel>
           <form onSubmit={login}>
             <h2>Code eingeben</h2>
-            <p>{sent ? "Wir haben dir einen 6-stelligen Code oder Login-Link gesendet. Bitte prüfe auch Spam." : "Sende zuerst deinen Code."}</p>
+            <p>{sent ? "Bitte prüfe deinen Posteingang und den Spam-Ordner." : "Sende zuerst deinen Code."}</p>
             <div className="otp-row" aria-hidden>
               {Array.from({ length: 6 }).map((_, index) => (
                 <span key={index}>{otp[index] ?? "–"}</span>
