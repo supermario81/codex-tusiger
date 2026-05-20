@@ -4,9 +4,8 @@ import { PageShell } from "../../components/layout/PageShell";
 import { GlassPanel } from "../../components/ui/Card";
 
 export function LegalPage() {
-  const { legalPages, profile, trackEvent } = useApp();
+  const { language, legalPages, profile, trackEvent } = useApp();
   const { slug = "datenschutz" } = useParams();
-  const language = profile?.language ?? "de";
   const page =
     legalPages.find((item) => item.slug === slug && item.language === language) ??
     legalPages.find((item) => item.slug === slug) ??

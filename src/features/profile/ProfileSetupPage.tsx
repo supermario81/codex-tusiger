@@ -12,11 +12,10 @@ import { Input } from "../../components/ui/Input";
 const blockedNicknames = ["admin", "null", "undefined", "test"];
 
 export function ProfileSetupPage() {
-  const { profile, saveProfile, uploadAvatar } = useApp();
+  const { language, profile, saveProfile, setLanguage, uploadAvatar } = useApp();
   const navigate = useNavigate();
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl ?? "");
-  const [language, setLanguage] = useState<"de" | "en">(profile?.language ?? "de");
   const [error, setError] = useState("");
   const [uploadState, setUploadState] = useState("");
 
