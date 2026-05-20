@@ -150,9 +150,9 @@ export function RunPage() {
           <header><span className="live-dot" /> GPS OK <span>+{altitudeGain} m</span></header>
           <strong className="big-timer">{formatDuration(elapsed)}</strong>
           <small>Zeit</small>
-          <b>{steps} / 1000</b>
+          <b>{steps} / {config.totalSteps}</b>
           <span>Stufen</span>
-          <ProgressBar value={steps} />
+          <ProgressBar value={steps} max={config.totalSteps} />
           <div className="run-metrics">
             <span><Timer /> Pace / 100<br /><strong>{formatPace(elapsed / 10)}</strong></span>
             <span>GPS Punkte<br /><strong>{points.length}</strong></span>

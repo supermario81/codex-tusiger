@@ -15,7 +15,7 @@ export default defineConfig({
       manifest: {
         name: "Tusiger",
         short_name: "Tusiger",
-        description: "1000 Stufen. Deine Zeit.",
+        description: "1150 Stufen. Deine Zeit.",
         theme_color: "#344E41",
         background_color: "#DAD7CD",
         display: "standalone",

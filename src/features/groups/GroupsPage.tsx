@@ -10,43 +10,129 @@ import { formatDuration } from "../../lib/geo/geo";
 import { createInviteUrl, normalizeInviteCode } from "../../lib/community/community";
 
 export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invite" }) {
-  const { createGroup, groups, joinGroup } = useApp();
+  const { config, createGroup, groups, joinGroup, language } = useApp();
+  const t = language === "en" ? {
+    create: "Create group",
+    join: "Join",
+    name: "Name",
+    closed: "Closed",
+    closedHint: "Invite link only",
+    public: "Public",
+    publicHint: "Everyone can join",
+    createCta: "Create",
+    createdError: "Group could not be created.",
+    joinError: "Could not join group.",
+    invite: "Invite link",
+    copy: "Copy link",
+    joinCta: "Join group",
+    ready: "Ready to join with code",
+    privateGroup: "Closed group",
+    publicGroup: "Public group",
+    members: "Members",
+    inviteCode: "Invite code",
+    shareWhatsapp: "Share via WhatsApp",
+    leave: "Leave group",
+    groups: "Groups",
+    subtitle: "Move further together.",
+    ownCommunity: "Start your own community.",
+    joinCommunity: "Join an existing group.",
+    yourGroups: "Your groups",
+    active: "Active",
+    best: "Best time",
+    topGroup: "Top group",
+    thisWeek: "This week",
+    steps: "steps"
+  } : {
+    create: "Gruppe erstellen",
+    join: "Beitreten",
+    name: "Name",
+    closed: "Geschlossen",
+    closedHint: "Nur per Einladungslink",
+    public: "Öffentlich",
+    publicHint: "Alle können beitreten",
+    createCta: "Erstellen",
+    createdError: "Gruppe konnte nicht erstellt werden.",
+    joinError: "Gruppe konnte nicht beigetreten werden.",
+    invite: "Einladungslink",
+    copy: "Link kopieren",
+    joinCta: "Gruppe beitreten",
+    ready: "Bereit zum Beitreten mit Code",
+    privateGroup: "Geschlossene Gruppe",
+    publicGroup: "Öffentliche Gruppe",
+    members: "Mitglieder",
+    inviteCode: "Invite-Code",
+    shareWhatsapp: "Via WhatsApp teilen",
+    leave: "Gruppe verlassen",
+    groups: "Gruppen",
+    subtitle: "Gemeinsam weiter kommen.",
+    ownCommunity: "Starte deine eigene Community.",
+    joinCommunity: "Tritt einer bestehenden Gruppe bei.",
+    yourGroups: "Deine Gruppen",
+    active: "Aktiv",
+    best: "Bestzeit",
+    topGroup: "Top Gruppe",
+    thisWeek: "Diese Woche",
+    steps: "Stufen"
+  };
   const { groupId, inviteCode } = useParams();
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [isPrivate, setIsPrivate] = useState(true);
   const [invite, setInvite] = useState("");
+  const [error, setError] = useState("");
   const group = groups.find((item) => item.id === groupId) ?? groups[0];
 
   async function submitGroup(event: FormEvent) {
     event.preventDefault();
+    setError("");
     if (!name.trim()) {
       return;
     }
-    const next = await createGroup({ name: name.trim(), description, isPrivate: false });
-    setInvite(next.inviteCode);
+    try {
+      const next = await createGroup({ name: name.trim(), description: "", isPrivate });
+      setInvite(next.inviteCode);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t.createdError);
+    }
   }
 
   async function submitJoin(event: FormEvent) {
     event.preventDefault();
-    const next = await joinGroup(normalizeInviteCode(invite || inviteCode || ""));
-    setInvite(next.inviteCode);
+    setError("");
+    try {
+      const next = await joinGroup(normalizeInviteCode(invite || inviteCode || ""));
+      setInvite(next.inviteCode);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t.joinError);
+    }
   }
 
   if (mode === "new") {
     return (
       <PageShell back>
         <section className="simple-page">
-          <h1>Gruppe erstellen</h1>
+          <h1>{t.create}</h1>
           <GlassPanel>
             <form onSubmit={submitGroup}>
-              <Input label="Name" value={name} onChange={(event) => setName(event.currentTarget.value)} />
-              <Input label="Beschreibung" value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
-              <Button icon={<Plus />}>Erstellen</Button>
+              <Input label={t.name} value={name} onChange={(event) => setName(event.currentTarget.value)} />
+              <div className="group-privacy">
+                <button className={isPrivate ? "active" : ""} type="button" onClick={() => setIsPrivate(true)}>
+                  {t.closed}
+                  <small>{t.closedHint}</small>
+                </button>
+                <button className={!isPrivate ? "active" : ""} type="button" onClick={() => setIsPrivate(false)}>
+                  {t.public}
+                  <small>{t.publicHint}</small>
+                </button>
+              </div>
+              {error ? <p className="form-error">{error}</p> : null}
+              <Button icon={<Plus />}>{t.createCta}</Button>
             </form>
             {invite ? (
-              <p className="helper-line">
-                Invite-Link: <strong>{createInviteUrl(window.location.origin, window.location.pathname, invite)}</strong>
-              </p>
+              <div className="invite-result">
+                <p>{t.invite}</p>
+                <strong>{createInviteUrl(window.location.origin, window.location.pathname, invite)}</strong>
+                <Button variant="secondary" icon={<Copy />} onClick={() => navigator.clipboard?.writeText(createInviteUrl(window.location.origin, window.location.pathname, invite))}>{t.copy}</Button>
+              </div>
             ) : null}
           </GlassPanel>
         </section>
@@ -58,13 +144,14 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     return (
       <PageShell back>
         <section className="simple-page">
-          <h1>Beitreten</h1>
+          <h1>{t.join}</h1>
           <GlassPanel>
             <form onSubmit={submitJoin}>
               <Input label="Invite-Code" placeholder="GIPFEL" value={invite || inviteCode || ""} onChange={(event) => setInvite(event.currentTarget.value)} />
-              <Button icon={<UserRoundPlus />}>Gruppe beitreten</Button>
+              {error ? <p className="form-error">{error}</p> : null}
+              <Button icon={<UserRoundPlus />}>{t.joinCta}</Button>
             </form>
-            {invite ? <p className="helper-line">Bereit zum Beitreten mit Code {invite.toUpperCase()}</p> : null}
+            {invite ? <p className="helper-line">{t.ready} {invite.toUpperCase()}</p> : null}
           </GlassPanel>
         </section>
       </PageShell>
@@ -76,13 +163,13 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
       <PageShell back>
         <section className="simple-page">
           <h1>{group.name}</h1>
-          <p>{group.description}</p>
+          <p>{group.isPrivate ? t.privateGroup : t.publicGroup}</p>
           <GlassPanel className="group-detail">
-            <p>Mitglieder <strong>{group.memberCount}</strong></p>
-            <p>Invite-Code <strong>{group.inviteCode}</strong></p>
-            <Button variant="secondary" icon={<Copy />} onClick={() => navigator.clipboard?.writeText(createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode))}>Link kopieren</Button>
-            <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">Via WhatsApp teilen</Button></a>
-            <Button variant="danger" icon={<LogOut />}>Gruppe verlassen</Button>
+            <p>{t.members} <strong>{group.memberCount}</strong></p>
+            <p>{t.inviteCode} <strong>{group.inviteCode}</strong></p>
+            <Button variant="secondary" icon={<Copy />} onClick={() => navigator.clipboard?.writeText(createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode))}>{t.copy}</Button>
+            <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
+            <Button variant="danger" icon={<LogOut />}>{t.leave}</Button>
           </GlassPanel>
         </section>
       </PageShell>
@@ -92,29 +179,29 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
   return (
     <PageShell>
       <section className="groups-page">
-        <h1>Gruppen</h1>
-        <p>Gemeinsam weiter kommen.</p>
+        <h1>{t.groups}</h1>
+        <p>{t.subtitle}</p>
         <div className="group-actions">
-          <Link to="/groups/new"><UsersRound /> <strong>Gruppe erstellen</strong><span>Starte deine eigene Community.</span></Link>
-          <Link to="/groups/join"><UserRoundPlus /> <strong>Beitreten</strong><span>Tritt einer bestehenden Gruppe bei.</span></Link>
+          <Link to="/groups/new"><UsersRound /> <strong>{t.create}</strong><span>{t.ownCommunity}</span></Link>
+          <Link to="/groups/join"><UserRoundPlus /> <strong>{t.join}</strong><span>{t.joinCommunity}</span></Link>
         </div>
-        <h2>Deine Gruppen</h2>
+        <h2>{t.yourGroups}</h2>
         <GlassPanel className="group-list">
           {groups.map((item) => (
             <Link to={`/groups/${item.id}`} key={item.id}>
               <span className="round-icon"><UsersRound /></span>
-              <strong>{item.name}<small>Aktiv · {item.memberCount} Mitglieder</small></strong>
-              <span>Bestzeit<br /><b>{item.bestTimeSeconds ? formatDuration(item.bestTimeSeconds) : "–"}</b></span>
+              <strong>{item.name}<small>{t.active} · {item.memberCount} {t.members}</small></strong>
+              <span>{t.best}<br /><b>{item.bestTimeSeconds ? formatDuration(item.bestTimeSeconds) : "–"}</b></span>
               <ChevronRight />
             </Link>
           ))}
         </GlassPanel>
         <GlassPanel className="top-group">
-          <small>Top Gruppe</small>
+          <small>{t.topGroup}</small>
           <h2>Gipfelstürmer</h2>
-          <p>Diese Woche</p>
+          <p>{t.thisWeek}</p>
           {["Maria", "Tobias", "Lena"].map((person, index) => (
-            <p key={person}><b>{index + 1}</b> {person}<span>{812 - index * 56} / 1000 Stufen</span></p>
+            <p key={person}><b>{index + 1}</b> {person}<span>{812 - index * 56} / {config.totalSteps} {t.steps}</span></p>
           ))}
         </GlassPanel>
       </section>

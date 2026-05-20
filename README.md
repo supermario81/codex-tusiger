@@ -1,6 +1,6 @@
 # Tusiger
 
-1000 Stufen. Deine Zeit.
+1150 Stufen. Deine Zeit.
 
 Tusiger ist eine mobile-first PWA für die Tausender-Treppe. Nutzer können sich per E-Mail OTP anmelden, ein öffentliches Profil anlegen, einen GPS-basierten Lauf starten, die Zeit zwischen Start- und Zielzone messen, Ergebnisse validieren, persönliche Zeiten vergleichen und Ranglisten, Gruppen sowie Geschichte/Spenden ansehen.
 
@@ -153,6 +153,16 @@ Kein QR-Code wird künstlich generiert.
 ## iPhone PWA
 
 Safari öffnen, die GitHub-Pages-URL laden, Teilen-Button drücken und "Zum Home-Bildschirm" wählen.
+
+## Victory Sound
+
+Beim Finish versucht die App zuerst diese optionale Datei abzuspielen:
+
+```text
+public/audio/victory.mp3
+```
+
+Wenn die Datei fehlt oder Safari Autoplay blockiert, nutzt Tusiger automatisch eine kurze Web-Audio-Fanfare. Für eine eigene Datei nur lizenzfreie Musik/Sounds verwenden und die Lizenz dokumentieren.
 
 ## PWA basics
 

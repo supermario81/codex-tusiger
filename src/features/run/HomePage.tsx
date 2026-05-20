@@ -8,10 +8,27 @@ import { GlassPanel } from "../../components/ui/Card";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 
 export function HomePage() {
-  const { profile, runs } = useApp();
+  const { config, language, profile, runs } = useApp();
   const navigate = useNavigate();
+  const t = language === "en" ? {
+    today: "Today",
+    steps: "steps",
+    first: "Ready for your first Tusiger.",
+    keepGoing: "Keep going. Every step counts.",
+    start: "Start run",
+    leaderboard: "Leaderboard",
+    history: "Story & donation"
+  } : {
+    today: "Heute",
+    steps: "Stufen",
+    first: "Bereit für deinen ersten Tusiger.",
+    keepGoing: "Dranbleiben. Jeder Schritt zählt.",
+    start: "Lauf starten",
+    leaderboard: "Rangliste",
+    history: "Geschichte & Spenden"
+  };
   const bestRun = runs.find((run) => run.status === "valid");
-  const steps = bestRun?.estimatedSteps ?? 642;
+  const steps = bestRun?.estimatedSteps ?? 0;
 
   function handleStart() {
     navigate(profile ? "/pre-run" : "/login");
@@ -22,23 +39,23 @@ export function HomePage() {
       <section className="hero-home">
         <Logo />
         <GlassPanel className="progress-card">
-          <p className="eyebrow">Heute</p>
+          <p className="eyebrow">{t.today}</p>
           <strong>{steps}</strong>
-          <span>/ 1000 Stufen</span>
+          <span>/ {config.totalSteps} {t.steps}</span>
           <div className="stairs-visual" aria-hidden>
             <i />
           </div>
-          <ProgressBar value={steps} />
-          <p className="motivation"><Mountain size={22} /> Dranbleiben. Jeder Schritt zählt.</p>
+          <ProgressBar value={steps} max={config.totalSteps} />
+          <p className="motivation"><Mountain size={22} /> {bestRun ? t.keepGoing : t.first}</p>
         </GlassPanel>
         <Button icon={<Footprints />} onClick={handleStart}>
-          Lauf starten
+          {t.start}
         </Button>
         <Link className="action-row" to="/leaderboard">
-          <BarChart3 aria-hidden /> Rangliste <ChevronRight aria-hidden />
+          <BarChart3 aria-hidden /> {t.leaderboard} <ChevronRight aria-hidden />
         </Link>
         <Link className="action-row" to="/history">
-          <Heart aria-hidden /> Geschichte & Spenden <ChevronRight aria-hidden />
+          <Heart aria-hidden /> {t.history} <ChevronRight aria-hidden />
         </Link>
       </section>
     </PageShell>

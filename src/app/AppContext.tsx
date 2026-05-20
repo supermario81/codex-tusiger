@@ -40,8 +40,14 @@ const anonymousUserId = "anonymous";
 const languageKey = "tusiger.language";
 
 function getInitialLanguage(): "de" | "en" {
-  if (typeof localStorage === "undefined") return "de";
-  return localStorage.getItem(languageKey) === "en" ? "en" : "de";
+  if (typeof localStorage !== "undefined") {
+    const stored = localStorage.getItem(languageKey);
+    if (stored === "en" || stored === "de") return stored;
+  }
+  if (typeof navigator !== "undefined") {
+    return navigator.language.toLowerCase().startsWith("en") ? "en" : "de";
+  }
+  return "de";
 }
 
 function errorMessage(cause: unknown) {
@@ -54,6 +60,44 @@ function errorMessage(cause: unknown) {
 
 function cleanEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function avatarStoragePath(publicUrl: string) {
+  const marker = "/storage/v1/object/public/avatars/";
+  const index = publicUrl.indexOf(marker);
+  return index >= 0 ? decodeURIComponent(publicUrl.slice(index + marker.length)) : "";
+}
+
+async function compressAvatarToWebp(file: File) {
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Bild konnte nicht gelesen werden."));
+      image.src = sourceUrl;
+    });
+
+    const maxSide = 720;
+    const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Avatar konnte nicht verarbeitet werden.");
+    context.drawImage(image, 0, 0, width, height);
+
+    for (const quality of [0.86, 0.78, 0.7, 0.62, 0.54]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      if (blob && blob.size <= 1024 * 1024) return blob;
+    }
+    throw new Error("Avatar konnte nicht unter 1 MB optimiert werden.");
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
 }
 
 function publicRunFromRun(run: RunRecord, rank: number, profile?: Profile | null): PublicRun {
@@ -232,16 +276,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       throw new Error("Bitte JPG, PNG oder WebP verwenden.");
     }
-    if (file.size > 2 * 1024 * 1024) {
-      throw new Error("Avatar darf maximal 2 MB groß sein.");
+    if (file.size > 8 * 1024 * 1024) {
+      throw new Error("Avatar-Ausgangsbild darf maximal 8 MB groß sein.");
     }
-    const extension = file.type.split("/")[1].replace("jpeg", "jpg");
-    const path = `${user.id}/avatar-${Date.now()}.${extension}`;
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+    const blob = await compressAvatarToWebp(file);
+    const oldPath = profile?.avatarUrl ? avatarStoragePath(profile.avatarUrl) : "";
+    const path = `${user.id}/avatar-${Date.now()}.webp`;
+    const { error } = await supabase.storage.from("avatars").upload(path, blob, { upsert: true, contentType: "image/webp" });
     if (error) throw error;
+    if (oldPath && oldPath.startsWith(`${user.id}/`) && oldPath !== path) {
+      await supabase.storage.from("avatars").remove([oldPath]).catch(() => undefined);
+    }
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
     return data.publicUrl;
-  }, [user]);
+  }, [profile?.avatarUrl, user]);
 
   const saveProfile = useCallback(async (input: { nickname: string; avatarUrl: string; language: "de" | "en" }) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
@@ -295,6 +343,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (pointError) throw pointError;
     }
     await trackEvent("run_validated", { status: run.status });
+    localStore.upsertRun(run);
     setRuns((current) => [run, ...current.filter((item) => item.id !== run.id)]);
     setLeaderboard((current) => run.status === "valid" ? [publicRunFromRun(run, current.length + 1, profile), ...current] : current);
   }, [profile, trackEvent, user]);
@@ -314,7 +363,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .select("*")
       .single();
     if (error) throw error;
-    await supabase.from("group_members").insert({ group_id: data.id, user_id: user.id, role: "owner" });
+    const { error: memberError } = await supabase.from("group_members").insert({ group_id: data.id, user_id: user.id, role: "owner" });
+    if (memberError) throw memberError;
     await trackEvent("group_created");
     const group = fromGroupRow(data, "owner");
     setGroups((current) => [group, ...current]);

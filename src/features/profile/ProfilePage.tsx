@@ -1,4 +1,5 @@
-import { History, LogOut, Settings, Trophy, UsersRound } from "lucide-react";
+import { ChangeEvent, useState } from "react";
+import { History, ImagePlus, LogOut, Settings, Trophy, UsersRound } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
@@ -8,32 +9,81 @@ import { GlassPanel } from "../../components/ui/Card";
 import { formatDuration } from "../../lib/geo/geo";
 
 export function ProfilePage() {
-  const { logout, profile, runs } = useApp();
+  const { language, logout, profile, runs, saveProfile, uploadAvatar } = useApp();
+  const t = language === "en" ? {
+    title: "Profile",
+    optimizing: "Optimizing avatar...",
+    updated: "Avatar updated.",
+    failed: "Avatar could not be updated.",
+    visible: "Rookie · Publicly visible",
+    noTime: "No time yet",
+    history: "Run history",
+    empty: "No runs saved yet.",
+    groups: "Groups",
+    story: "Story",
+    settings: "Privacy & settings"
+  } : {
+    title: "Profil",
+    optimizing: "Avatar wird optimiert...",
+    updated: "Avatar aktualisiert.",
+    failed: "Avatar konnte nicht aktualisiert werden.",
+    visible: "Rookie · Öffentlich sichtbar",
+    noTime: "Noch keine Zeit",
+    history: "Lauf-History",
+    empty: "Noch keine Läufe gespeichert.",
+    groups: "Gruppen",
+    story: "Geschichte",
+    settings: "Datenschutz & Einstellungen"
+  };
+  const [avatarState, setAvatarState] = useState("");
+  const [avatarError, setAvatarError] = useState("");
   if (!profile) {
     return <Navigate to="/login" replace />;
   }
 
+  const currentProfile = profile;
   const best = runs.filter((run) => run.status === "valid").sort((a, b) => a.durationSeconds - b.durationSeconds)[0];
+
+  async function handleAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    setAvatarError("");
+    setAvatarState(t.optimizing);
+    try {
+      const avatarUrl = await uploadAvatar(file);
+      await saveProfile({ nickname: currentProfile.nickname, avatarUrl, language });
+      setAvatarState(t.updated);
+    } catch (cause) {
+      setAvatarError(cause instanceof Error ? cause.message : t.failed);
+      setAvatarState("");
+    }
+  }
 
   return (
     <PageShell>
       <section className="simple-page">
-        <h1>Profil</h1>
+        <h1>{t.title}</h1>
         <GlassPanel className="profile-card">
-          <Avatar name={profile.nickname} url={profile.avatarUrl} size="lg" />
-          <h2>{profile.nickname}</h2>
-          <p>Rookie · Öffentlich sichtbar</p>
-          <span className="status-badge status-valid"><Trophy size={16} /> {best ? formatDuration(best.durationSeconds) : "Noch keine Zeit"}</span>
+          <label className="profile-avatar-edit">
+            <Avatar name={currentProfile.nickname} url={currentProfile.avatarUrl} size="lg" />
+            <span><ImagePlus /></span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatar} />
+          </label>
+          <h2>{currentProfile.nickname}</h2>
+          <p>{t.visible}</p>
+          <span className="status-badge status-valid"><Trophy size={16} /> {best ? formatDuration(best.durationSeconds) : t.noTime}</span>
+          {avatarState ? <small>{avatarState}</small> : null}
+          {avatarError ? <p className="form-error">{avatarError}</p> : null}
         </GlassPanel>
         <GlassPanel className="run-history-list">
-          <h2>Lauf-History</h2>
-          {runs.length === 0 ? <p>Noch keine Läufe gespeichert.</p> : runs.slice(0, 5).map((run) => (
+          <h2>{t.history}</h2>
+          {runs.length === 0 ? <p>{t.empty}</p> : runs.slice(0, 5).map((run) => (
             <p key={run.id}>{new Date(run.startedAt).toLocaleDateString("de-CH")} <strong>{formatDuration(run.durationSeconds)}</strong> <span>{run.status}</span></p>
           ))}
         </GlassPanel>
-        <Link className="action-row" to="/groups"><UsersRound /> Gruppen</Link>
-        <Link className="action-row" to="/history"><History /> Geschichte</Link>
-        <Link className="action-row" to="/settings"><Settings /> Datenschutz & Einstellungen</Link>
+        <Link className="action-row" to="/groups"><UsersRound /> {t.groups}</Link>
+        <Link className="action-row" to="/history"><History /> {t.story}</Link>
+        <Link className="action-row" to="/settings"><Settings /> {t.settings}</Link>
         <Button variant="secondary" onClick={logout} icon={<LogOut />}>Logout</Button>
       </section>
     </PageShell>

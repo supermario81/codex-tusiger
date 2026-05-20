@@ -3,7 +3,7 @@ import type { ChallengeConfig, HistoryItem, LegalPage, MotivationMessage, Public
 export const defaultChallengeConfig: ChallengeConfig = {
   id: "tusiger-default",
   name: "Tusiger",
-  totalSteps: 1000,
+  totalSteps: 1150,
   startLat: 47.315206553,
   startLng: 7.886963657,
   startRadiusM: 25,
@@ -25,18 +25,18 @@ export const defaultChallengeConfig: ChallengeConfig = {
 };
 
 export const motivationMessages: MotivationMessage[] = [
-  { minSteps: 0, maxSteps: 200, intensity: 1, message: "Starker Start. Finde deinen Rhythmus." },
-  { minSteps: 0, maxSteps: 200, intensity: 1, message: "Ruhig bleiben. Jeder Schritt zählt." },
-  { minSteps: 200, maxSteps: 400, intensity: 2, message: "Dranbleiben. Du bist im Flow." },
-  { minSteps: 200, maxSteps: 400, intensity: 2, message: "Stabil. Genau so weiter." },
-  { minSteps: 400, maxSteps: 600, intensity: 3, message: "Halbzeit. Jetzt beginnt der echte Tusiger." },
-  { minSteps: 400, maxSteps: 600, intensity: 3, message: "Du hast den Berg im Griff." },
-  { minSteps: 600, maxSteps: 800, intensity: 4, message: "Nicht nachlassen. Du bist stärker als du denkst." },
-  { minSteps: 600, maxSteps: 800, intensity: 4, message: "Jetzt zählt Fokus." },
-  { minSteps: 800, maxSteps: 950, intensity: 5, message: "Letzte Meter. Alles geben." },
-  { minSteps: 800, maxSteps: 950, intensity: 5, message: "Oben wartet deine Zeit." },
-  { minSteps: 950, maxSteps: 1000, intensity: 6, message: "Finish. Zieh durch." },
-  { minSteps: 950, maxSteps: 1000, intensity: 6, message: "Du hast es gleich geschafft." }
+  { minSteps: 0, maxSteps: 100, intensity: 1, message: "Starker Start. Finde deinen Rhythmus." },
+  { minSteps: 100, maxSteps: 200, intensity: 1, message: "Ruhig bleiben. Jeder Schritt zählt." },
+  { minSteps: 200, maxSteps: 300, intensity: 2, message: "Dranbleiben. Du bist im Flow." },
+  { minSteps: 300, maxSteps: 400, intensity: 2, message: "Stabil. Genau so weiter." },
+  { minSteps: 400, maxSteps: 500, intensity: 3, message: "Du hast den Berg im Griff." },
+  { minSteps: 500, maxSteps: 600, intensity: 3, message: "Halbzeit. Jetzt beginnt der echte Tusiger." },
+  { minSteps: 600, maxSteps: 700, intensity: 4, message: "Nicht nachlassen. Du bist stärker als du denkst." },
+  { minSteps: 700, maxSteps: 800, intensity: 4, message: "Jetzt zählt Fokus." },
+  { minSteps: 800, maxSteps: 900, intensity: 5, message: "Letzte Meter rücken näher. Sauber weiter." },
+  { minSteps: 900, maxSteps: 1000, intensity: 5, message: "Oben wartet deine Zeit." },
+  { minSteps: 1000, maxSteps: 1100, intensity: 6, message: "Finish-Zone. Zieh durch." },
+  { minSteps: 1100, maxSteps: 1151, intensity: 6, message: "Du hast es gleich geschafft." }
 ];
 
 export const historyFallback: HistoryItem[] = [
@@ -118,6 +118,42 @@ export const legalFallback: LegalPage[] = [
     version: "draft-legal-review-required",
     active: true,
     body: "Entwurf, rechtlich zu prüfen. Standortdaten werden erst nach Nutzeraktion im Pre-Run und während eines aktiven Laufs verwendet. Safari kann Höhenwerte ungenau oder gar nicht liefern."
+  },
+  {
+    id: "privacy-en",
+    slug: "datenschutz",
+    language: "en",
+    title: "Privacy Policy",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Draft, legal review required. Operator: Mario Martic / seven-art.com, Riedtalstrasse 14a, 4800 Zofingen, Switzerland, mario@seven-art.com. The app processes email for sign-in, public profile data, GPS points during active runs, group memberships and first-party analytics events. Email addresses are never shown publicly."
+  },
+  {
+    id: "terms-en",
+    slug: "nutzungsbedingungen",
+    language: "en",
+    title: "Terms of Use",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Draft, legal review required. Tusiger is a private heart project. Use is voluntary. Sporting activity is at your own responsibility."
+  },
+  {
+    id: "imprint-en",
+    slug: "impressum",
+    language: "en",
+    title: "Imprint",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Mario Martic / seven-art.com, Riedtalstrasse 14a, 4800 Zofingen, Switzerland. Email: mario@seven-art.com. Phone: 076 572 20 81."
+  },
+  {
+    id: "sensors-en",
+    slug: "standort-sensoren",
+    language: "en",
+    title: "Location and Sensor Consent",
+    version: "draft-legal-review-required",
+    active: true,
+    body: "Draft, legal review required. Location data is only used after user action during the pre-run check and while a run is active. Safari may provide inaccurate altitude values or none at all."
   }
 ];
 

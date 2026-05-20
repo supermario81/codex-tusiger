@@ -7,7 +7,7 @@ import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
-import { LanguageSwitcher } from "../../components/ui/LanguageSwitcher";
+import { InstallHint } from "../../components/ui/InstallHint";
 
 const copy = {
   de: {
@@ -116,7 +116,7 @@ export function LoginPage() {
   return (
     <PageShell nav={false} compactLogo={false}>
       <section className="auth-page">
-        <LanguageSwitcher />
+        <InstallHint />
         <Logo />
         <h1>{t.title}</h1>
         <p>{t.subtitle}</p>

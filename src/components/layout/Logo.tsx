@@ -8,7 +8,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
       {!compact ? (
         <>
           <span>TUSIGER</span>
-          <em>1000 Stufen. Deine Zeit.</em>
+          <em>1150 Stufen. Deine Zeit.</em>
         </>
       ) : null}
     </div>

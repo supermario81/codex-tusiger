@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
+import { LanguageSwitcher } from "../ui/LanguageSwitcher";
 import { Logo } from "./Logo";
 
 export function PageShell({
@@ -21,8 +22,8 @@ export function PageShell({
   return (
     <main className={`page-shell ${dark ? "page-dark" : ""}`}>
       <div className="app-frame">
-        <div className="status-spacer" aria-hidden>
-          <span>9:41</span>
+        <div className="global-language-switcher">
+          <LanguageSwitcher />
         </div>
         {back ? (
           <button className="back-button" type="button" onClick={() => navigate(-1)} aria-label="Zurück">

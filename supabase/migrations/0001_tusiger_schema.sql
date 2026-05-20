@@ -16,7 +16,7 @@ create table if not exists public.challenge_config (
   id uuid primary key default gen_random_uuid(),
   active boolean not null default true,
   name text not null default 'Tusiger',
-  total_steps int not null default 1000,
+  total_steps int not null default 1150,
   start_lat numeric not null default 47.315206553,
   start_lng numeric not null default 7.886963657,
   start_radius_m numeric not null default 25,
@@ -97,14 +97,15 @@ create table if not exists public.group_members (
 
 create table if not exists public.history_content (
   id uuid primary key default gen_random_uuid(),
-  slug text unique,
+  slug text,
   language text not null default 'de' check (language in ('de', 'en')),
   year_label text,
   title text,
   body text,
   sort_order int not null default 0,
   active boolean not null default true,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique(slug, language)
 );
 
 create table if not exists public.legal_pages (
@@ -271,7 +272,7 @@ insert into public.challenge_config (
   gps_accuracy_review_max_m, min_duration_seconds, max_duration_seconds,
   publish_needs_review, donation_url, active
 ) values (
-  'Tusiger', 1000, 47.315206553, 7.886963657, 25, 47.318954559, 7.882850574, 35,
+  'Tusiger', 1150, 47.315206553, 7.886963657, 25, 47.318954559, 7.882850574, 35,
   235, 205, 265, 180, 290, 25, 45, 240, 7200, false, '', true
 ) on conflict do nothing;
 
@@ -281,7 +282,7 @@ insert into public.history_content (slug, language, year_label, title, body, sor
 ('1986', 'de', '1986', 'Neuerstellung', 'Neuerstellung des Stäglis durch den Aarburger Initianten Herbert Scheidegger, kurz «Born-Hörbi» genannt.', 3),
 ('1987-open', 'de', '1987', 'Eröffnung', 'Eröffnung des Stäglis, heute 1150 Stufen.', 4),
 ('1987-care', 'de', '1987', 'Unterhalt durch Freiwillige', 'Beginn mit dem Unterhalt durch Freiwillige.', 5)
-on conflict (slug) do nothing;
+on conflict (slug, language) do nothing;
 
 insert into public.legal_pages (slug, language, title, body, version) values
 ('datenschutz', 'de', 'Datenschutzrichtlinie', 'Entwurf, rechtlich zu prüfen. Betreiber: Mario Martic / seven-art.com, Riedtalstrasse 14a, 4800 Zofingen, Schweiz, mario@seven-art.com. Verarbeitet werden E-Mail für Auth, öffentliche Profilangaben, GPS-Punkte während aktiver Läufe, Gruppen und first-party Analytics.', 'draft-legal-review-required'),
@@ -291,7 +292,7 @@ insert into public.legal_pages (slug, language, title, body, version) values
 on conflict (slug, language) do nothing;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('avatars', 'avatars', true, 2097152, array['image/jpeg','image/png','image/webp'])
+values ('avatars', 'avatars', true, 1048576, array['image/jpeg','image/png','image/webp'])
 on conflict (id) do nothing;
 
 drop policy if exists "avatar read public" on storage.objects;

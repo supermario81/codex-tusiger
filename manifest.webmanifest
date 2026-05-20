@@ -1,15 +1,15 @@
 {
   "name": "Tusiger",
   "short_name": "Tusiger",
-  "description": "1000 Stufen. Deine Zeit.",
-  "start_url": "/",
-  "scope": "/",
+  "description": "1150 Stufen. Deine Zeit.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#DAD7CD",
   "theme_color": "#344E41",
   "icons": [
     {
-      "src": "/icons/icon.svg",
+      "src": "icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

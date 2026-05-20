@@ -45,8 +45,9 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   width: min(100%, 430px);
   min-height: 100vh;
-  padding: 24px 24px 118px;
-  overflow: hidden;
+  padding: 72px 24px 118px;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .page-dark {
@@ -54,14 +55,12 @@ a { color: inherit; text-decoration: none; }
   background: linear-gradient(150deg, #1f2a22, #344E41 56%, #141a16);
 }
 
-.status-spacer {
-  height: 26px;
-  display: flex;
-  align-items: center;
-  font-weight: 800;
-  color: #101612;
+.global-language-switcher {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 6;
 }
-.page-dark .status-spacer { color: #f7f3e8; }
 
 .logo {
   display: grid;
@@ -175,6 +174,7 @@ h1 {
   line-height: .96;
   letter-spacing: 0;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 h2 { color: var(--deep); letter-spacing: 0; }
 
@@ -360,6 +360,37 @@ form { display: grid; gap: 16px; }
   font-size: 1.25rem;
 }
 .privacy-copy { text-align: center; color: rgba(52,78,65,.76); }
+.privacy-copy a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 760;
+}
+.install-hint {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 34px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.65);
+  border-radius: 20px;
+  background: rgba(255,252,243,.82);
+  box-shadow: 0 12px 32px rgba(52,78,65,.12);
+}
+.install-hint span,
+.install-hint button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.install-hint span { color: white; background: var(--leaf); }
+.install-hint button {
+  border: 0;
+  background: rgba(52,78,65,.08);
+  color: var(--deep);
+}
+.install-hint p { margin: 0; font-size: .86rem; line-height: 1.25; }
 
 .avatar {
   display: inline-grid;
@@ -919,7 +950,80 @@ form { display: grid; gap: 16px; }
   justify-items: center;
   text-align: center !important;
 }
-.simple-page { padding-top: 52px; }
+.profile-avatar-edit {
+  position: relative;
+  display: inline-grid;
+  cursor: pointer;
+}
+.profile-avatar-edit input { display: none; }
+.profile-avatar-edit > span {
+  position: absolute;
+  right: 2px;
+  bottom: 10px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255,255,255,.82);
+  border-radius: 50%;
+  background: var(--leaf);
+  color: white;
+}
+.simple-page {
+  width: 100%;
+  max-width: 390px;
+  justify-self: center;
+  padding-top: 36px;
+}
+.simple-page h1 {
+  font-size: clamp(2.25rem, 12vw, 3.8rem);
+}
+.simple-page .glass-panel,
+.legal-page .glass-panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.legal-page p {
+  line-height: 1.35;
+  white-space: normal;
+}
+.group-privacy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.group-privacy button {
+  min-height: 78px;
+  border: 1px solid rgba(52,78,65,.18);
+  border-radius: 18px;
+  background: rgba(255,255,255,.34);
+  color: var(--deep);
+  font-weight: 800;
+}
+.group-privacy button.active {
+  color: white;
+  background: linear-gradient(135deg, var(--sage), var(--leaf));
+}
+.group-privacy small {
+  display: block;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.invite-result {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.invite-result strong {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.42);
+  font-size: .82rem;
+}
 
 @media (max-width: 380px) {
   .app-frame { padding-inline: 16px; }

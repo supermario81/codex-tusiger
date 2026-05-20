@@ -22,10 +22,10 @@ export function LegalPage() {
           <p>{page?.body ?? "Dieser Inhalt wird vorbereitet."}</p>
         </GlassPanel>
         <GlassPanel className="legal-links">
-          <Link to="/legal/datenschutz">Datenschutz</Link>
-          <Link to="/legal/nutzungsbedingungen">Nutzungsbedingungen</Link>
-          <Link to="/legal/impressum">Impressum</Link>
-          <Link to="/legal/standort-sensoren">Standort & Sensoren</Link>
+          <Link to="/legal/datenschutz">{language === "en" ? "Privacy" : "Datenschutz"}</Link>
+          <Link to="/legal/nutzungsbedingungen">{language === "en" ? "Terms of Use" : "Nutzungsbedingungen"}</Link>
+          <Link to="/legal/impressum">{language === "en" ? "Imprint" : "Impressum"}</Link>
+          <Link to="/legal/standort-sensoren">{language === "en" ? "Location & Sensors" : "Standort & Sensoren"}</Link>
         </GlassPanel>
       </section>
     </PageShell>
