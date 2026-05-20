@@ -70,7 +70,7 @@ In Supabase unter Authentication -> Sign In / Providers -> Email:
 - Confirm email: enabled
 - Secure email change: enabled
 - Double confirm email changes: enabled
-- Optional fuer einfacheres Testen: OTP Length auf `6` setzen. Tusiger akzeptiert Codes mit 6 bis 10 Ziffern.
+- OTP Length: `6`. Tusiger zeigt und akzeptiert genau 6 Ziffern.
 
 Der erste E-Mail-OTP-Login bestätigt die Adresse und erstellt den Auth-User. Es braucht keinen separaten zweiten Double-Opt-in-Schritt.
 
@@ -86,7 +86,7 @@ Code-plus-Link-Vorlage für `Confirm sign up` und `Magic link or OTP`:
 ```html
 <h2>Dein Tusiger Login-Code</h2>
 
-<p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
+<p>Gib diesen 6-stelligen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
 
 <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
 
@@ -104,14 +104,14 @@ Mehrsprachige Code-plus-Link-Vorlage für beide Templates:
 ```html
 {{ if eq .Data.language "en" }}
   <h2>Your Tusiger sign-in code</h2>
-  <p>Enter this code in the Tusiger app. It expires shortly and can only be used once.</p>
+  <p>Enter this 6-digit code in the Tusiger app. It expires shortly and can only be used once.</p>
   <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
   <p>Or sign in directly:</p>
   <p><a href="{{ .ConfirmationURL }}">Sign in now</a></p>
   <p>If you did not request this sign-in, you can ignore this email.</p>
 {{ else }}
   <h2>Dein Tusiger Login-Code</h2>
-  <p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
+  <p>Gib diesen 6-stelligen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
   <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
   <p>Oder direkt anmelden:</p>
   <p><a href="{{ .ConfirmationURL }}">Jetzt direkt einloggen</a></p>

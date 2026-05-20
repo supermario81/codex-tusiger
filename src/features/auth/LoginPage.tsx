@@ -21,7 +21,7 @@ const copy = {
     send: "Code senden",
     sentTitle: "Code ist unterwegs",
     sentBody: "Wir haben eine E-Mail an",
-    sentInstruction: "gesendet. Gib den Code ein oder nutze den Direktlink in der E-Mail.",
+    sentInstruction: "gesendet. Gib den 6-stelligen Code ein oder nutze den Direktlink in der E-Mail.",
     currentSession: "Du bist aktuell angemeldet als",
     continue: "Weiter zur App",
     switchAccount: "Anderes Konto verwenden",
@@ -29,7 +29,7 @@ const copy = {
     codeTitle: "Code eingeben",
     inbox: "Bitte prüfe deinen Posteingang und den Spam-Ordner.",
     sendFirst: "Sende zuerst deinen Code.",
-    codePlaceholder: "6- bis 10-stelliger Supabase-Code",
+    codePlaceholder: "6-stelliger Supabase-Code",
     login: "Einloggen",
     privacy: "Mit der Anmeldung stimmst du unserer Datenschutzerklärung zu. GPS wird erst vor dem Lauf angefragt.",
     privacyLink: "Datenschutz",
@@ -46,7 +46,7 @@ const copy = {
     send: "Send code",
     sentTitle: "Code sent",
     sentBody: "We sent an email to",
-    sentInstruction: "Enter the code or use the direct sign-in link in the email.",
+    sentInstruction: "Enter the 6-digit code or use the direct sign-in link in the email.",
     currentSession: "You are currently signed in as",
     continue: "Continue to app",
     switchAccount: "Use another account",
@@ -54,7 +54,7 @@ const copy = {
     codeTitle: "Enter code",
     inbox: "Please check your inbox and spam folder.",
     sendFirst: "Send your code first.",
-    codePlaceholder: "6 to 10-digit Supabase code",
+    codePlaceholder: "6-digit Supabase code",
     login: "Sign in",
     privacy: "By signing in, you agree to our privacy policy. GPS is requested only before a run.",
     privacyLink: "Privacy",
@@ -71,7 +71,6 @@ export function LoginPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const otpBoxCount = Math.max(6, Math.min(10, otp.length || 6));
 
   async function sendCode(event: FormEvent) {
     event.preventDefault();
@@ -160,14 +159,14 @@ export function LoginPage() {
             <h2>{t.codeTitle}</h2>
             <p>{sent ? t.inbox : t.sendFirst}</p>
             <div className="otp-row" aria-hidden>
-              {Array.from({ length: otpBoxCount }).map((_, index) => (
+              {Array.from({ length: 6 }).map((_, index) => (
                 <span key={index}>{otp[index] ?? "–"}</span>
               ))}
             </div>
             <Input
               value={otp}
               inputMode="numeric"
-              maxLength={10}
+              maxLength={6}
               placeholder={t.codePlaceholder}
               onChange={(event) => setOtp(event.currentTarget.value.replace(/\D/g, ""))}
             />

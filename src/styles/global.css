@@ -349,7 +349,7 @@ form { display: grid; gap: 16px; }
   width: 18px;
   height: 18px;
 }
-.otp-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 8px; }
+.otp-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
 .otp-row span {
   min-height: 58px;
   display: grid;
