@@ -28,9 +28,10 @@ npm run build
 
 1. Neues Supabase-Projekt erstellen.
 2. SQL aus `supabase/migrations/0001_tusiger_schema.sql` ausführen.
-3. In Supabase Auth E-Mail OTP aktivieren.
-4. Storage-Bucket `avatars` wird durch die Migration angelegt.
-5. `.env.example` nach `.env.local` kopieren:
+3. SQL aus `supabase/migrations/0002_public_grants.sql` ausführen.
+4. In Supabase Auth E-Mail OTP aktivieren.
+5. Storage-Bucket `avatars` wird durch die Migration angelegt.
+6. `.env.example` nach `.env.local` kopieren:
 
 ```bash
 VITE_SUPABASE_URL=https://gmbtkmorvretjwaegkln.supabase.co
@@ -53,7 +54,7 @@ Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitH
 
 ## Supabase Migration
 
-Führe `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Die Migration erstellt:
+Führe zuerst `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Danach führe `supabase/migrations/0002_public_grants.sql` aus. Die Migrationen erstellen:
 
 - Profile, Läufe, GPS-Punkte, Gruppen, History, Legal Pages, Analytics und Audit Logs
 - RLS Policies

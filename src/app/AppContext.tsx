@@ -36,6 +36,14 @@ type AppContextValue = {
 const AppContext = createContext<AppContextValue | null>(null);
 const anonymousUserId = "anonymous";
 
+function errorMessage(cause: unknown) {
+  if (cause instanceof Error) return cause.message;
+  if (cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string") {
+    return cause.message;
+  }
+  return "Supabase konnte nicht geladen werden.";
+}
+
 function publicRunFromRun(run: RunRecord, rank: number, profile?: Profile | null): PublicRun {
   return {
     id: run.id,
@@ -145,7 +153,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }))
       );
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Supabase konnte nicht geladen werden.";
+      const message = errorMessage(cause);
       setSetupError(`Supabase Setup unvollständig: ${message}. Bitte Migration ausführen und GitHub Secret VITE_SUPABASE_ANON_KEY setzen.`);
       setSession(null);
       setProfile(null);
