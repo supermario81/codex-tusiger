@@ -1,4 +1,4 @@
-import { Globe2, ImagePlus } from "lucide-react";
+import { Globe2, ImagePlus, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
@@ -68,7 +68,7 @@ export function ProfileSetupPage() {
         <h1>Dein Profil</h1>
         <p>Wähle einen Nickname und Avatar, um loszulegen.</p>
         <label className="avatar-upload">
-          <Avatar name={nickname || "Tusiger"} url={avatarUrl} size="lg" />
+          {avatarUrl ? <Avatar name={nickname || "Tusiger"} url={avatarUrl} size="lg" /> : <UserRound aria-hidden />}
           <span><ImagePlus aria-hidden /></span>
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatar} />
         </label>
@@ -95,7 +95,7 @@ export function ProfileSetupPage() {
         <Button disabled={!isValid}>Weiter</Button>
         <GlassPanel className="preview-card">
           <h2>Vorschau</h2>
-          <Avatar name={nickname || "Dein Nickname"} url={avatarUrl} size="md" />
+          <Avatar name={nickname || ""} url={avatarUrl} size="md" />
           <div>
             <strong>{nickname || "Dein Nickname"}</strong>
             <span>642 Stufen</span>
