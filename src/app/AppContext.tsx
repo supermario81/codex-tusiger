@@ -219,25 +219,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.");
     }
-    const client = supabase;
     const normalizedEmail = cleanEmail(email);
     const cleanToken = token.trim();
-    const attempts = [
-      () => client.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "email" }),
-      () => client.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "magiclink" }),
-      () => client.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "signup" })
-    ];
-    let lastError: unknown = null;
-    for (const attempt of attempts) {
-      const { error } = await attempt();
-      if (!error) {
-        await trackEvent("login_completed");
-        await refreshData();
-        return;
-      }
-      lastError = error;
-    }
-    throw lastError;
+    const { error } = await supabase.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "email" });
+    if (error) throw error;
+    await trackEvent("login_completed");
+    await refreshData();
   }, [refreshData, trackEvent]);
 
   const uploadAvatar = useCallback(async (file: File) => {
