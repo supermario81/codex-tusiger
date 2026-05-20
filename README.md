@@ -79,9 +79,9 @@ Supabase nutzt je nach Zustand der Adresse unterschiedliche Templates:
 - neue Adresse: `Confirm sign up`
 - bestehende Adresse: `Magic link or OTP`
 
-Beide Templates müssen denselben Code-only-Inhalt bekommen, sonst erhältst du einmal einen Link und einmal einen Code.
+Beide Templates müssen denselben Inhalt bekommen, sonst erhältst du einmal einen anderen Link-/Code-Flow als beim nächsten Login.
 
-Code-only-Vorlage für `Confirm sign up` und `Magic link or OTP`:
+Code-plus-Link-Vorlage für `Confirm sign up` und `Magic link or OTP`:
 
 ```html
 <h2>Dein Tusiger Login-Code</h2>
@@ -90,23 +90,31 @@ Code-only-Vorlage für `Confirm sign up` und `Magic link or OTP`:
 
 <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
 
+<p>Oder direkt anmelden:</p>
+
+<p><a href="{{ .ConfirmationURL }}">Jetzt direkt einloggen</a></p>
+
 <p>Wenn du diese Anmeldung nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
 ```
 
-Wichtig: Für Code-Login keinen `{{ .ConfirmationURL }}`-Link in diesen Templates verwenden. One-Time-Links können durch Webmail-Preview, Security-Scanner oder versehentliches Öffnen verbraucht werden.
+Hinweis: Der Code und der Direktlink sind One-Time-Logins. Wenn der Link geöffnet wird, ist der Code aus derselben Mail danach verbraucht. Darum beim Testen entweder Code eingeben oder Link klicken, nicht beides nacheinander.
 
-Mehrsprachige Code-only-Vorlage für beide Templates:
+Mehrsprachige Code-plus-Link-Vorlage für beide Templates:
 
 ```html
 {{ if eq .Data.language "en" }}
   <h2>Your Tusiger sign-in code</h2>
   <p>Enter this code in the Tusiger app. It expires shortly and can only be used once.</p>
   <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
+  <p>Or sign in directly:</p>
+  <p><a href="{{ .ConfirmationURL }}">Sign in now</a></p>
   <p>If you did not request this sign-in, you can ignore this email.</p>
 {{ else }}
   <h2>Dein Tusiger Login-Code</h2>
   <p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
   <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px;">{{ .Token }}</p>
+  <p>Oder direkt anmelden:</p>
+  <p><a href="{{ .ConfirmationURL }}">Jetzt direkt einloggen</a></p>
   <p>Wenn du diese Anmeldung nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
 {{ end }}
 ```
