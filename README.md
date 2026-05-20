@@ -70,6 +70,7 @@ In Supabase unter Authentication -> Sign In / Providers -> Email:
 - Confirm email: enabled
 - Secure email change: enabled
 - Double confirm email changes: enabled
+- Optional fuer einfacheres Testen: OTP Length auf `6` setzen. Tusiger akzeptiert Codes mit 6 bis 10 Ziffern.
 
 Der erste E-Mail-OTP-Login bestätigt die Adresse und erstellt den Auth-User. Es braucht keinen separaten zweiten Double-Opt-in-Schritt.
 
