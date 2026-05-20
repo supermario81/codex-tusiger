@@ -69,14 +69,16 @@ export function LoginPage() {
   async function sendCode(event: FormEvent) {
     event.preventDefault();
     setError("");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError(t.invalidEmail);
       return;
     }
+    setEmail(cleanEmail);
 
     setLoading(true);
     try {
-      await loginWithEmail(email, language);
+      await loginWithEmail(cleanEmail, language);
       setSent(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t.sendFailed);

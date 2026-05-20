@@ -52,6 +52,10 @@ function errorMessage(cause: unknown) {
   return "Supabase konnte nicht geladen werden.";
 }
 
+function cleanEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 function publicRunFromRun(run: RunRecord, rank: number, profile?: Profile | null): PublicRun {
   return {
     id: run.id,
@@ -201,7 +205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await trackEvent("login_started", { method: "email" });
     const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: cleanEmail(email),
       options: {
         emailRedirectTo: redirectTo,
         shouldCreateUser: true,
@@ -215,10 +219,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.");
     }
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
-    if (error) throw error;
-    await trackEvent("login_completed");
-    await refreshData();
+    const client = supabase;
+    const normalizedEmail = cleanEmail(email);
+    const cleanToken = token.trim();
+    const attempts = [
+      () => client.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "email" }),
+      () => client.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "magiclink" }),
+      () => client.auth.verifyOtp({ email: normalizedEmail, token: cleanToken, type: "signup" })
+    ];
+    let lastError: unknown = null;
+    for (const attempt of attempts) {
+      const { error } = await attempt();
+      if (!error) {
+        await trackEvent("login_completed");
+        await refreshData();
+        return;
+      }
+      lastError = error;
+    }
+    throw lastError;
   }, [refreshData, trackEvent]);
 
   const uploadAvatar = useCallback(async (file: File) => {
