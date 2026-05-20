@@ -7,10 +7,59 @@ import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
+import { LanguageSwitcher } from "../../components/ui/LanguageSwitcher";
+
+const copy = {
+  de: {
+    title: "Willkommen zurück",
+    subtitle: "Melde dich mit E-Mail an",
+    invalidEmail: "Bitte gib eine gültige E-Mail-Adresse ein.",
+    sendFailed: "Code konnte nicht gesendet werden.",
+    invalidCode: "Der Code ist ungültig.",
+    emailPlaceholder: "Deine E-Mail-Adresse",
+    sending: "Sende...",
+    send: "Code senden",
+    sentTitle: "Code ist unterwegs",
+    sentBody: "Wir haben eine E-Mail an",
+    sentInstruction: "gesendet. Gib den 6-stelligen Code ein oder nutze den Login-Link.",
+    changeEmail: "E-Mail ändern",
+    codeTitle: "Code eingeben",
+    inbox: "Bitte prüfe deinen Posteingang und den Spam-Ordner.",
+    sendFirst: "Sende zuerst deinen Code.",
+    codePlaceholder: "6-stelliger Supabase-Code",
+    login: "Einloggen",
+    privacy: "Mit der Anmeldung stimmst du unserer Datenschutzerklärung zu. GPS wird erst vor dem Lauf angefragt.",
+    privacyLink: "Datenschutz",
+    termsLink: "Nutzungsbedingungen"
+  },
+  en: {
+    title: "Welcome back",
+    subtitle: "Sign in with email",
+    invalidEmail: "Please enter a valid email address.",
+    sendFailed: "The code could not be sent.",
+    invalidCode: "The code is invalid.",
+    emailPlaceholder: "Your email address",
+    sending: "Sending...",
+    send: "Send code",
+    sentTitle: "Code sent",
+    sentBody: "We sent an email to",
+    sentInstruction: "Enter the 6-digit code or use the sign-in link.",
+    changeEmail: "Change email",
+    codeTitle: "Enter code",
+    inbox: "Please check your inbox and spam folder.",
+    sendFirst: "Send your code first.",
+    codePlaceholder: "6-digit Supabase code",
+    login: "Sign in",
+    privacy: "By signing in, you agree to our privacy policy. GPS is requested only before a run.",
+    privacyLink: "Privacy",
+    termsLink: "Terms"
+  }
+};
 
 export function LoginPage() {
-  const { loginWithEmail, profile, setupError, user, verifyOtp } = useApp();
+  const { language, loginWithEmail, profile, setupError, user, verifyOtp } = useApp();
   const navigate = useNavigate();
+  const t = copy[language];
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
@@ -21,16 +70,16 @@ export function LoginPage() {
     event.preventDefault();
     setError("");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Bitte gib eine gültige E-Mail-Adresse ein.");
+      setError(t.invalidEmail);
       return;
     }
 
     setLoading(true);
     try {
-      await loginWithEmail(email);
+      await loginWithEmail(email, language);
       setSent(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Code konnte nicht gesendet werden.");
+      setError(cause instanceof Error ? cause.message : t.sendFailed);
     } finally {
       setLoading(false);
     }
@@ -50,7 +99,7 @@ export function LoginPage() {
       await verifyOtp(email, otp);
       navigate(profile ? "/" : "/setup-profile");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Der Code ist ungültig.");
+      setError(cause instanceof Error ? cause.message : t.invalidCode);
     } finally {
       setLoading(false);
     }
@@ -60,9 +109,10 @@ export function LoginPage() {
     user && profile ? <Navigate to="/" replace /> :
     <PageShell nav={false} compactLogo={false}>
       <section className="auth-page">
+        <LanguageSwitcher />
         <Logo />
-        <h1>Willkommen zurück</h1>
-        <p>Melde dich mit E-Mail an</p>
+        <h1>{t.title}</h1>
+        <p>{t.subtitle}</p>
         {setupError ? <GlassPanel className="setup-warning"><strong>Setup fehlt</strong><p>{setupError}</p></GlassPanel> : null}
         {!sent ? (
           <GlassPanel>
@@ -70,28 +120,28 @@ export function LoginPage() {
               <Input
                 value={email}
                 inputMode="email"
-                placeholder="Deine E-Mail-Adresse"
+                placeholder={t.emailPlaceholder}
                 onChange={(event) => setEmail(event.currentTarget.value)}
               />
               <Button disabled={loading} icon={<Send />}>
-                {loading ? "Sende..." : "Code senden"}
+                {loading ? t.sending : t.send}
               </Button>
             </form>
           </GlassPanel>
         ) : (
           <GlassPanel className="sent-panel">
             <div className="sent-icon"><MailCheck /></div>
-            <h2>Code ist unterwegs</h2>
-            <p>Wir haben eine E-Mail an <strong>{email}</strong> gesendet. Gib den 6-stelligen Code ein oder nutze den Login-Link.</p>
+            <h2>{t.sentTitle}</h2>
+            <p>{t.sentBody} <strong>{email}</strong> {t.sentInstruction}</p>
             <button className="text-button" type="button" onClick={changeEmail}>
-              <ArrowLeft /> E-Mail ändern
+              <ArrowLeft /> {t.changeEmail}
             </button>
           </GlassPanel>
         )}
         <GlassPanel>
           <form onSubmit={login}>
-            <h2>Code eingeben</h2>
-            <p>{sent ? "Bitte prüfe deinen Posteingang und den Spam-Ordner." : "Sende zuerst deinen Code."}</p>
+            <h2>{t.codeTitle}</h2>
+            <p>{sent ? t.inbox : t.sendFirst}</p>
             <div className="otp-row" aria-hidden>
               {Array.from({ length: 6 }).map((_, index) => (
                 <span key={index}>{otp[index] ?? "–"}</span>
@@ -101,19 +151,19 @@ export function LoginPage() {
               value={otp}
               inputMode="numeric"
               maxLength={6}
-              placeholder="6-stelliger Supabase-Code"
+              placeholder={t.codePlaceholder}
               onChange={(event) => setOtp(event.currentTarget.value.replace(/\D/g, ""))}
             />
             {error ? <p className="form-error">{error}</p> : null}
             <Button disabled={!sent || loading} icon={<LockKeyhole />}>
-              Einloggen
+              {t.login}
             </Button>
           </form>
         </GlassPanel>
         <p className="privacy-copy">
-          Mit der Anmeldung stimmst du unserer Datenschutzerklärung zu. GPS wird erst vor dem Lauf angefragt.
+          {t.privacy}
           {" "}
-          <Link to="/legal/datenschutz">Datenschutz</Link> · <Link to="/legal/nutzungsbedingungen">Nutzungsbedingungen</Link>
+          <Link to="/legal/datenschutz">{t.privacyLink}</Link> · <Link to="/legal/nutzungsbedingungen">{t.termsLink}</Link>
         </p>
       </section>
     </PageShell>

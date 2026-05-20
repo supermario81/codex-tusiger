@@ -10,6 +10,8 @@ type AppContextValue = {
   ready: boolean;
   setupError: string | null;
   isSupabaseConfigured: boolean;
+  language: "de" | "en";
+  setLanguage: (language: "de" | "en") => void;
   session: Session | null;
   user: User | null;
   userId: string;
@@ -20,7 +22,7 @@ type AppContextValue = {
   leaderboard: PublicRun[];
   history: HistoryItem[];
   legalPages: LegalPage[];
-  loginWithEmail: (email: string) => Promise<void>;
+  loginWithEmail: (email: string, language?: "de" | "en") => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<void>;
   saveProfile: (input: { nickname: string; avatarUrl: string; language: "de" | "en" }) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
@@ -35,6 +37,12 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | null>(null);
 const anonymousUserId = "anonymous";
+const languageKey = "tusiger.language";
+
+function getInitialLanguage(): "de" | "en" {
+  if (typeof localStorage === "undefined") return "de";
+  return localStorage.getItem(languageKey) === "en" ? "en" : "de";
+}
 
 function errorMessage(cause: unknown) {
   if (cause instanceof Error) return cause.message;
@@ -68,9 +76,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<ChallengeConfig>(defaultChallengeConfig);
   const [history, setHistory] = useState<HistoryItem[]>(historyFallback);
   const [legalPages, setLegalPages] = useState<LegalPage[]>(legalFallback);
+  const [language, setLanguageState] = useState<"de" | "en">(getInitialLanguage);
 
   const user = session?.user ?? null;
   const userId = user?.id ?? anonymousUserId;
+
+  const setLanguage = useCallback((nextLanguage: "de" | "en") => {
+    setLanguageState(nextLanguage);
+    localStorage.setItem(languageKey, nextLanguage);
+  }, []);
 
   const trackEvent = useCallback(async (eventName: string, metadata: Record<string, unknown> = {}) => {
     if (!isSupabaseConfigured || !supabase) {
@@ -126,6 +140,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ]);
         const nextProfile = profileRows?.[0] ? fromProfileRow(profileRows[0]) : null;
         setProfile(nextProfile);
+        if (nextProfile?.language) {
+          setLanguage(nextProfile.language);
+        }
         const nextRuns = (runRows ?? []).map(fromRunRow);
         setRuns(nextRuns);
         setGroups((memberRows ?? []).flatMap((row) => {
@@ -163,7 +180,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setReady(true);
     }
-  }, []);
+  }, [setLanguage]);
 
   useEffect(() => {
     localStorage.setItem("tusiger.sessionId", localStorage.getItem("tusiger.sessionId") ?? crypto.randomUUID());
@@ -177,7 +194,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, [refreshData]);
 
-  const loginWithEmail = useCallback(async (email: string) => {
+  const loginWithEmail = useCallback(async (email: string, requestedLanguage: "de" | "en" = language) => {
     if (!isSupabaseConfigured || !supabase) {
       throw new Error("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.");
     }
@@ -185,10 +202,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirectTo, shouldCreateUser: true }
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: true,
+        data: { language: requestedLanguage }
+      }
     });
     if (error) throw error;
-  }, [trackEvent]);
+  }, [language, trackEvent]);
 
   const verifyOtp = useCallback(async (email: string, token: string) => {
     if (!isSupabaseConfigured || !supabase) {
@@ -228,6 +249,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
     if (error) throw error;
+    await supabase.auth.updateUser({ data: { language: input.language } }).catch(() => undefined);
     await trackEvent("profile_completed");
     await refreshData();
   }, [profile?.role, refreshData, trackEvent, user]);
@@ -323,6 +345,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ready,
       setupError,
       isSupabaseConfigured,
+      language,
+      setLanguage,
       session,
       user,
       userId,
@@ -345,7 +369,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trackEvent,
       refreshData
     }),
-    [config, createGroup, deleteAccount, groups, history, joinGroup, leaderboard, legalPages, loginWithEmail, logout, profile, ready, refreshData, runs, saveProfile, saveRun, session, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
+    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, legalPages, loginWithEmail, logout, profile, ready, refreshData, runs, saveProfile, saveRun, session, setLanguage, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -66,6 +66,39 @@ Wenn die Login-Mail auf `localhost:3000` zeigt, ist die Supabase Site URL noch f
 
 Damit in der Mail ein 6-stelliger Code sichtbar ist, passe unter Authentication -> Email Templates -> Magic Link den Text an und füge `{{ .Token }}` ein. Der Link bleibt zusätzlich über `{{ .ConfirmationURL }}` möglich.
 
+Deutsche MVP-Vorlage:
+
+```html
+<h2>Dein Tusiger Login-Code</h2>
+
+<p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
+
+<p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{{ .Token }}</p>
+
+<p>Alternativ kannst du dich direkt über diesen Link anmelden:</p>
+<p><a href="{{ .ConfirmationURL }}">Bei Tusiger einloggen</a></p>
+```
+
+Mehrsprachige Vorlage mit `user_metadata.language`:
+
+```html
+{{ if eq .Data.language "en" }}
+  <h2>Your Tusiger sign-in code</h2>
+  <p>Enter this code in the Tusiger app. It expires shortly and can only be used once.</p>
+  <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{{ .Token }}</p>
+  <p>Or sign in directly with this link:</p>
+  <p><a href="{{ .ConfirmationURL }}">Sign in to Tusiger</a></p>
+{{ else }}
+  <h2>Dein Tusiger Login-Code</h2>
+  <p>Gib diesen Code in der Tusiger App ein. Der Code ist nur kurze Zeit gültig und kann nur einmal verwendet werden.</p>
+  <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">{{ .Token }}</p>
+  <p>Alternativ kannst du dich direkt über diesen Link anmelden:</p>
+  <p><a href="{{ .ConfirmationURL }}">Bei Tusiger einloggen</a></p>
+{{ end }}
+```
+
+Tusiger setzt beim ersten OTP-Versand `user_metadata.language` auf `de` oder `en` und aktualisiert diese Sprache beim Speichern des Profils. Eine vollständig dynamische Sprache pro unregistriertem Loginversuch braucht später einen Supabase Custom Email Hook oder getrennte Auth-Projekte.
+
 ## Supabase Migration
 
 Führe zuerst `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Danach führe `supabase/migrations/0002_public_grants.sql` aus. Die Migrationen erstellen:
