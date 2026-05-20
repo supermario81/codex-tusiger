@@ -68,13 +68,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured || !supabase) {
       return;
     }
-    await supabase.from("analytics_events").insert({
-      user_id: supabase.auth.getUser ? (await supabase.auth.getUser()).data.user?.id ?? null : null,
-      session_id: localStorage.getItem("tusiger.sessionId") ?? crypto.randomUUID(),
-      event_name: eventName,
-      page: window.location.hash || "/",
-      metadata
-    });
+    try {
+      await supabase.from("analytics_events").insert({
+        user_id: supabase.auth.getUser ? (await supabase.auth.getUser()).data.user?.id ?? null : null,
+        session_id: localStorage.getItem("tusiger.sessionId") ?? crypto.randomUUID(),
+        event_name: eventName,
+        page: window.location.hash || "/",
+        metadata
+      });
+    } catch {
+      // Analytics must never block the app.
+    }
   }, []);
 
   const refreshData = useCallback(async () => {
@@ -84,62 +88,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setSetupError(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentSession = sessionData.session;
-    setSession(currentSession);
+    try {
+      setSetupError(null);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentSession = sessionData.session;
+      setSession(currentSession);
 
-    const [{ data: configRows }, { data: historyRows }, { data: legalRows }] = await Promise.all([
-      supabase.from("challenge_config").select("*").eq("active", true).limit(1),
-      supabase.from("history_content").select("*").eq("active", true).order("sort_order"),
-      supabase.from("legal_pages").select("*").eq("active", true).order("slug")
-    ]);
+      const [{ data: configRows, error: configError }, { data: historyRows }, { data: legalRows }] = await Promise.all([
+        supabase.from("challenge_config").select("*").eq("active", true).limit(1),
+        supabase.from("history_content").select("*").eq("active", true).order("sort_order"),
+        supabase.from("legal_pages").select("*").eq("active", true).order("slug")
+      ]);
 
-    if (configRows?.[0]) setConfig(fromConfigRow(configRows[0]));
-    if (historyRows?.length) setHistory(historyRows.map(fromHistoryRow));
-    if (legalRows?.length) setLegalPages(legalRows.map(fromLegalRow));
+      if (configError) throw configError;
+      if (configRows?.[0]) setConfig(fromConfigRow(configRows[0]));
+      if (historyRows?.length) setHistory(historyRows.map(fromHistoryRow));
+      if (legalRows?.length) setLegalPages(legalRows.map(fromLegalRow));
 
-    if (!currentSession?.user) {
+      if (!currentSession?.user) {
+        setProfile(null);
+        setRuns([]);
+        setGroups([]);
+      } else {
+        const user_id = currentSession.user.id;
+        const [{ data: profileRows }, { data: runRows }, { data: memberRows }] = await Promise.all([
+          supabase.from("profiles").select("*").eq("user_id", user_id).is("deleted_at", null).limit(1),
+          supabase.from("runs").select("*").eq("user_id", user_id).order("started_at", { ascending: false }),
+          supabase.from("group_members").select("role, groups(*)").eq("user_id", user_id)
+        ]);
+        const nextProfile = profileRows?.[0] ? fromProfileRow(profileRows[0]) : null;
+        setProfile(nextProfile);
+        const nextRuns = (runRows ?? []).map(fromRunRow);
+        setRuns(nextRuns);
+        setGroups((memberRows ?? []).flatMap((row) => {
+          const groupRow = Array.isArray(row.groups) ? row.groups[0] : row.groups;
+          return groupRow ? [fromGroupRow(groupRow as unknown as Record<string, unknown>, String(row.role))] : [];
+        }));
+      }
+
+      const { data: leaderboardRows } = await supabase
+        .from("leaderboard_public")
+        .select("*")
+        .order("duration_seconds", { ascending: true })
+        .limit(100);
+
+      setLeaderboard(
+        (leaderboardRows ?? []).map((row, index) => ({
+          id: String(row.id),
+          rank: index + 1,
+          nickname: String(row.nickname ?? "Tusiger"),
+          avatarUrl: String(row.avatar_url ?? ""),
+          durationSeconds: Number(row.duration_seconds),
+          date: String(row.ended_at ?? row.started_at),
+          status: "valid",
+          isCurrentUser: row.user_id === currentSession?.user.id
+        }))
+      );
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Supabase konnte nicht geladen werden.";
+      setSetupError(`Supabase Setup unvollständig: ${message}. Bitte Migration ausführen und GitHub Secret VITE_SUPABASE_ANON_KEY setzen.`);
+      setSession(null);
       setProfile(null);
       setRuns([]);
       setGroups([]);
-    } else {
-      const user_id = currentSession.user.id;
-      const [{ data: profileRows }, { data: runRows }, { data: memberRows }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("user_id", user_id).is("deleted_at", null).limit(1),
-        supabase.from("runs").select("*").eq("user_id", user_id).order("started_at", { ascending: false }),
-        supabase.from("group_members").select("role, groups(*)").eq("user_id", user_id)
-      ]);
-      const nextProfile = profileRows?.[0] ? fromProfileRow(profileRows[0]) : null;
-      setProfile(nextProfile);
-      const nextRuns = (runRows ?? []).map(fromRunRow);
-      setRuns(nextRuns);
-      setGroups((memberRows ?? []).flatMap((row) => {
-        const groupRow = Array.isArray(row.groups) ? row.groups[0] : row.groups;
-        return groupRow ? [fromGroupRow(groupRow as unknown as Record<string, unknown>, String(row.role))] : [];
-      }));
+      setLeaderboard([]);
+    } finally {
+      setReady(true);
     }
-
-    const { data: leaderboardRows } = await supabase
-      .from("leaderboard_public")
-      .select("*")
-      .order("duration_seconds", { ascending: true })
-      .limit(100);
-
-    setLeaderboard(
-      (leaderboardRows ?? []).map((row, index) => ({
-        id: String(row.id),
-        rank: index + 1,
-        nickname: String(row.nickname ?? "Tusiger"),
-        avatarUrl: String(row.avatar_url ?? ""),
-        durationSeconds: Number(row.duration_seconds),
-        date: String(row.ended_at ?? row.started_at),
-        status: "valid",
-        isCurrentUser: row.user_id === currentSession?.user.id
-      }))
-    );
-
-    setReady(true);
   }, []);
 
   useEffect(() => {

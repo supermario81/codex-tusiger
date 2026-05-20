@@ -797,6 +797,15 @@ form { display: grid; gap: 16px; }
   gap: 8px;
   margin: 0;
 }
+.admin-checklist p {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.admin-checklist svg {
+  width: 18px;
+  height: 18px;
+}
 
 .profile-card {
   display: grid;

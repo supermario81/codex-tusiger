@@ -204,6 +204,7 @@ create policy "challenge admin write" on public.challenge_config for all using (
 
 drop policy if exists "runs own insert" on public.runs;
 drop policy if exists "runs own read" on public.runs;
+drop policy if exists "runs own update draft" on public.runs;
 drop policy if exists "runs admin update" on public.runs;
 create policy "runs own insert" on public.runs for insert with check (auth.uid() = user_id);
 create policy "runs own read" on public.runs for select using (
@@ -243,12 +244,23 @@ create policy "members owner manage" on public.group_members for delete using (
   )
 );
 
+drop policy if exists "history read active" on public.history_content;
+drop policy if exists "history admin write" on public.history_content;
 create policy "history read active" on public.history_content for select using (active = true);
 create policy "history admin write" on public.history_content for all using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "legal read active" on public.legal_pages;
+drop policy if exists "legal admin write" on public.legal_pages;
 create policy "legal read active" on public.legal_pages for select using (active = true);
 create policy "legal admin write" on public.legal_pages for all using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "analytics insert own or anon" on public.analytics_events;
+drop policy if exists "analytics admin read" on public.analytics_events;
 create policy "analytics insert own or anon" on public.analytics_events for insert with check (user_id is null or auth.uid() = user_id);
 create policy "analytics admin read" on public.analytics_events for select using (public.is_admin());
+
+drop policy if exists "audit admin read" on public.audit_logs;
+drop policy if exists "audit insert own" on public.audit_logs;
 create policy "audit admin read" on public.audit_logs for select using (public.is_admin());
 create policy "audit insert own" on public.audit_logs for insert with check (user_id is null or auth.uid() = user_id);
 
