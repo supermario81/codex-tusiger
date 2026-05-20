@@ -1,6 +1,6 @@
-import { ArrowLeft, LockKeyhole, MailCheck, Send } from "lucide-react";
+import { ArrowLeft, LockKeyhole, LogOut, MailCheck, Send } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { Logo } from "../../components/layout/Logo";
 import { PageShell } from "../../components/layout/PageShell";
@@ -21,7 +21,10 @@ const copy = {
     send: "Code senden",
     sentTitle: "Code ist unterwegs",
     sentBody: "Wir haben eine E-Mail an",
-    sentInstruction: "gesendet. Gib den 6-stelligen Code aus dieser E-Mail ein.",
+    sentInstruction: "gesendet. Gib den Code aus dieser E-Mail ein.",
+    currentSession: "Du bist aktuell angemeldet als",
+    continue: "Weiter zur App",
+    switchAccount: "Anderes Konto verwenden",
     changeEmail: "E-Mail ändern",
     codeTitle: "Code eingeben",
     inbox: "Bitte prüfe deinen Posteingang und den Spam-Ordner.",
@@ -43,7 +46,10 @@ const copy = {
     send: "Send code",
     sentTitle: "Code sent",
     sentBody: "We sent an email to",
-    sentInstruction: "Enter the 6-digit code from this email.",
+    sentInstruction: "Enter the code from this email.",
+    currentSession: "You are currently signed in as",
+    continue: "Continue to app",
+    switchAccount: "Use another account",
     changeEmail: "Change email",
     codeTitle: "Enter code",
     inbox: "Please check your inbox and spam folder.",
@@ -57,7 +63,7 @@ const copy = {
 };
 
 export function LoginPage() {
-  const { language, loginWithEmail, profile, setupError, user, verifyOtp } = useApp();
+  const { language, loginWithEmail, logout, profile, setupError, user, verifyOtp } = useApp();
   const navigate = useNavigate();
   const t = copy[language];
   const [email, setEmail] = useState("");
@@ -109,7 +115,6 @@ export function LoginPage() {
   }
 
   return (
-    user && profile ? <Navigate to="/" replace /> :
     <PageShell nav={false} compactLogo={false}>
       <section className="auth-page">
         <LanguageSwitcher />
@@ -117,7 +122,16 @@ export function LoginPage() {
         <h1>{t.title}</h1>
         <p>{t.subtitle}</p>
         {setupError ? <GlassPanel className="setup-warning"><strong>Setup fehlt</strong><p>{setupError}</p></GlassPanel> : null}
-        {!sent ? (
+        {user ? (
+          <GlassPanel className="sent-panel">
+            <div className="sent-icon"><MailCheck /></div>
+            <h2>{profile?.nickname ?? user.email}</h2>
+            <p>{t.currentSession} <strong>{user.email}</strong>.</p>
+            <Button onClick={() => navigate(profile ? "/" : "/setup-profile")}>{t.continue}</Button>
+            <Button variant="secondary" icon={<LogOut />} onClick={logout}>{t.switchAccount}</Button>
+          </GlassPanel>
+        ) : null}
+        {!user && !sent ? (
           <GlassPanel>
             <form onSubmit={sendCode}>
               <Input
@@ -131,7 +145,7 @@ export function LoginPage() {
               </Button>
             </form>
           </GlassPanel>
-        ) : (
+        ) : !user ? (
           <GlassPanel className="sent-panel">
             <div className="sent-icon"><MailCheck /></div>
             <h2>{t.sentTitle}</h2>
@@ -140,8 +154,8 @@ export function LoginPage() {
               <ArrowLeft /> {t.changeEmail}
             </button>
           </GlassPanel>
-        )}
-        <GlassPanel>
+        ) : null}
+        {!user ? <GlassPanel>
           <form onSubmit={login}>
             <h2>{t.codeTitle}</h2>
             <p>{sent ? t.inbox : t.sendFirst}</p>
@@ -162,7 +176,7 @@ export function LoginPage() {
               {t.login}
             </Button>
           </form>
-        </GlassPanel>
+        </GlassPanel> : null}
         <p className="privacy-copy">
           {t.privacy}
           {" "}
