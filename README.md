@@ -36,6 +36,7 @@ npm run build
 ```bash
 VITE_SUPABASE_URL=https://gmbtkmorvretjwaegkln.supabase.co
 VITE_SUPABASE_ANON_KEY=dein-anon-key
+VITE_APP_BASE_URL=https://supermario81.github.io/codex-tusiger/
 ```
 
 Wichtig: Niemals den Supabase Service Role Key im Frontend oder in GitHub committen.
@@ -49,8 +50,9 @@ In GitHub hinterlegen:
 - Repository Settings -> Pages -> Source: GitHub Actions
 - Secrets: `VITE_SUPABASE_ANON_KEY`
 - Optional Secret: `VITE_SUPABASE_URL`, falls ein anderes Projekt genutzt wird
+- Optional Variable: `VITE_APP_BASE_URL`, Standard `https://supermario81.github.io/codex-tusiger/`
 
-Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitHub-Actions-Build. Die App verwendet `HashRouter`, damit Reloads und Deep Links auf GitHub Pages funktionieren, z. B. `/#/join/CODE`.
+Für das Repo `codex-tusiger` setzt Vite den Pages-Basispfad automatisch im GitHub-Actions-Build. Die App verwendet `HashRouter`, damit Reloads und Deep Links auf GitHub Pages funktionieren, z. B. `/#/join/TUS5D29A02B`. Einladungslinks werden immer aus `VITE_APP_BASE_URL` gebaut, damit nie versehentlich ein Bild- oder Asset-Pfad in den Link gelangt.
 
 ## Supabase Auth Setup
 
@@ -123,7 +125,17 @@ Tusiger setzt beim ersten OTP-Versand `user_metadata.language` auf `de` oder `en
 
 ## Supabase Migration
 
-Führe zuerst `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Danach führe `supabase/migrations/0002_public_grants.sql` aus. Die Migrationen erstellen:
+Führe zuerst `supabase/migrations/0001_tusiger_schema.sql` im Supabase SQL Editor aus. Danach führe die weiteren Migrationen der Reihe nach aus:
+
+```text
+supabase/migrations/0002_public_grants.sql
+supabase/migrations/0003_tusiger_1150_steps_avatar_limit.sql
+supabase/migrations/0004_multilingual_content.sql
+supabase/migrations/0005_group_rpc.sql
+supabase/migrations/0006_fix_group_invites_rls.sql
+```
+
+Die Migrationen erstellen:
 
 - Profile, Läufe, GPS-Punkte, Gruppen, History, Legal Pages, Analytics und Audit Logs
 - RLS Policies

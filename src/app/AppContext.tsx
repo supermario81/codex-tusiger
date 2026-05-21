@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { defaultChallengeConfig, historyFallback, legalFallback } from "../data/challenge";
+import { normalizeInviteCode } from "../lib/community/community";
 import { isSupabaseConfigured, supabase } from "../lib/supabase/client";
 import { fromConfigRow, fromGroupRow, fromHistoryRow, fromLegalRow, fromProfileRow, fromRunRow, toRunInsert } from "../lib/supabase/mappers";
 import { localStore } from "../lib/storage/localStore";
@@ -64,13 +65,31 @@ function cleanEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-function generateInviteCode() {
-  const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
-  return `TUS${randomPart}`;
-}
-
-function withRpcFallbackMessage(action: string, rpcError: unknown, fallbackError: unknown) {
-  return new Error(`${action}: ${errorMessage(fallbackError)} RPC: ${errorMessage(rpcError)}. Bitte Supabase-Migration 0005_group_rpc.sql ausführen, falls geschlossene Invite-Links nicht funktionieren.`);
+function friendlyGroupError(cause: unknown, language: "de" | "en", fallbackKey: "create" | "join" | "leave" = "join") {
+  const message = errorMessage(cause).toLowerCase();
+  if (message.includes("group_name_already_exists") || message.includes("groups_unique_name_lower") || message.includes("duplicate key")) {
+    return language === "en"
+      ? "A group with this name already exists. Please choose another name."
+      : "Eine Gruppe mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.";
+  }
+  if (message.includes("group_name_too_short") || message.includes("too_short")) {
+    return language === "en"
+      ? "The group name must be at least 3 characters long."
+      : "Der Gruppenname muss mindestens 3 Zeichen lang sein.";
+  }
+  if (message.includes("invalid_invite_code") || message.includes("group_not_found")) {
+    return language === "en"
+      ? "No group was found for this invite code."
+      : "Zu diesem Einladungs-Code wurde keine Gruppe gefunden.";
+  }
+  if (message.includes("could not find the function") || message.includes("schema cache") || message.includes("list_my_groups") || message.includes("join_group_by_invite")) {
+    return language === "en"
+      ? "The group feature needs the latest Supabase migration. Please ask the admin to run 0006_fix_group_invites_rls.sql."
+      : "Die Gruppenfunktion braucht die aktuelle Supabase-Migration. Bitte 0006_fix_group_invites_rls.sql ausführen.";
+  }
+  if (fallbackKey === "create") return language === "en" ? "Group could not be created." : "Gruppe konnte nicht erstellt werden.";
+  if (fallbackKey === "leave") return language === "en" ? "Could not leave group." : "Gruppe konnte nicht verlassen werden.";
+  return language === "en" ? "Could not join group." : "Gruppe konnte nicht beigetreten werden.";
 }
 
 function avatarStoragePath(publicUrl: string) {
@@ -194,11 +213,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setPublicGroups([]);
       } else {
         const user_id = currentSession.user.id;
+        const currentSupabase = supabase;
         const [{ data: profileRows }, { data: runRows }, myGroupsResult, publicGroupsResult] = await Promise.all([
-          supabase.from("profiles").select("*").eq("user_id", user_id).is("deleted_at", null).limit(1),
-          supabase.from("runs").select("*").eq("user_id", user_id).order("started_at", { ascending: false }),
-          supabase.rpc("list_my_groups"),
-          supabase.rpc("list_public_groups")
+          currentSupabase.from("profiles").select("*").eq("user_id", user_id).is("deleted_at", null).limit(1),
+          currentSupabase.from("runs").select("*").eq("user_id", user_id).order("started_at", { ascending: false }),
+          currentSupabase.rpc("get_my_groups").then((result) => result.error ? currentSupabase.rpc("list_my_groups") : result),
+          currentSupabase.rpc("get_public_groups").then((result) => result.error ? currentSupabase.rpc("list_public_groups") : result)
         ]);
         const nextProfile = profileRows?.[0] ? fromProfileRow(profileRows[0]) : null;
         setProfile(nextProfile);
@@ -207,6 +227,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         const nextRuns = (runRows ?? []).map(fromRunRow);
         setRuns(nextRuns);
+        if (myGroupsResult.error && import.meta.env.DEV) console.warn("Tusiger groups RPC failed", myGroupsResult.error);
+        if (publicGroupsResult.error && import.meta.env.DEV) console.warn("Tusiger public groups RPC failed", publicGroupsResult.error);
         const nextGroups: Group[] = myGroupsResult.error ? [] : ((myGroupsResult.data ?? []) as Record<string, unknown>[]).map((row) => fromGroupRow(row, String(row.role ?? "member")));
         setGroups(nextGroups);
         const memberIds = new Set(nextGroups.map((item) => item.id));
@@ -385,97 +407,113 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
     const currentUser = user;
     const currentSupabase = supabase;
-
-    const existingGroupNames = [...groups, ...publicGroups].map((item) => item.name.trim().toLowerCase());
-    if (existingGroupNames.includes(groupInput.name.trim().toLowerCase())) {
-      throw new Error("Dieser Gruppenname ist bereits vergeben.");
+    const cleanName = groupInput.name.trim();
+    if (cleanName.length < 3 || cleanName.length > 40) {
+      throw new Error(language === "en" ? "The group name must be 3–40 characters long." : "Der Gruppenname muss 3–40 Zeichen lang sein.");
     }
 
-    async function createDirect(rpcError?: unknown) {
+    const existingGroupNames = [...groups, ...publicGroups].map((item) => item.name.trim().toLowerCase());
+    if (existingGroupNames.includes(cleanName.toLowerCase())) {
+      throw new Error(language === "en" ? "A group with this name already exists. Please choose another name." : "Eine Gruppe mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.");
+    }
+
+    async function createDirect(cause?: unknown) {
       const id = crypto.randomUUID();
-      const inviteCode = generateInviteCode();
+      const inviteCode = `TUS${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
       const row = {
         id,
         owner_user_id: currentUser.id,
-        name: groupInput.name.trim(),
-        description: groupInput.description?.trim() ?? "",
+        name: cleanName,
+        description: "",
         invite_code: inviteCode,
         is_private: groupInput.isPrivate
       };
       const { error: groupError } = await currentSupabase.from("groups").insert(row);
-      if (groupError) {
-        if (rpcError) throw withRpcFallbackMessage("Gruppe konnte nicht erstellt werden", rpcError, groupError);
-        throw groupError;
-      }
+      if (groupError) throw new Error(friendlyGroupError(groupError, language, "create"));
       const { error: memberError } = await currentSupabase.from("group_members").insert({ group_id: id, user_id: currentUser.id, role: "owner" });
       if (memberError) {
         await currentSupabase.from("groups").delete().eq("id", id);
-        if (rpcError) throw withRpcFallbackMessage("Gruppenmitgliedschaft konnte nicht erstellt werden", rpcError, memberError);
-        throw memberError;
+        if (import.meta.env.DEV) console.warn("Tusiger direct create membership failed", cause, memberError);
+        throw new Error(friendlyGroupError(memberError, language, "create"));
       }
       return fromGroupRow({ ...row, member_count: 1, best_time_seconds: null }, "owner");
     }
 
-    let group: Group;
-    const rpcResult = await currentSupabase.rpc("create_tusiger_group", {
-      p_name: groupInput.name.trim(),
+    const rpcResult = await supabase.rpc("create_group_with_invite", {
+      p_name: cleanName,
       p_is_private: groupInput.isPrivate
     }).single();
 
+    let group: Group;
     if (rpcResult.error) {
-      group = await createDirect(rpcResult.error);
+      if (import.meta.env.DEV) console.warn("Tusiger create group failed", rpcResult.error);
+      const message = errorMessage(rpcResult.error).toLowerCase();
+      if (message.includes("could not find the function") || message.includes("schema cache")) {
+        group = await createDirect(rpcResult.error);
+      } else {
+        throw new Error(friendlyGroupError(rpcResult.error, language, "create"));
+      }
     } else {
       group = fromGroupRow(rpcResult.data as Record<string, unknown>, "owner");
+      if (!normalizeInviteCode(group.inviteCode)) {
+        group = await createDirect(new Error("legacy_group_rpc_returned_invalid_invite_code"));
+      }
     }
 
     await trackEvent("group_created");
     setGroups((current) => [group, ...current.filter((item) => item.id !== group.id)]);
     setPublicGroups((current) => current.filter((item) => item.id !== group.id));
+    await refreshData();
     return group;
-  }, [groups, publicGroups, trackEvent, user]);
+  }, [groups, language, publicGroups, refreshData, trackEvent, user]);
 
   const joinGroup = useCallback(async (inviteCode: string) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    const normalizedInviteCode = inviteCode.toUpperCase();
-    const rpcResult = await supabase.rpc("join_tusiger_group", {
-      p_invite_code: normalizedInviteCode
-    }).single();
-
-    let next: Group;
-    if (rpcResult.error) {
-      const { data: groupRow, error: groupError } = await supabase
-        .from("groups")
-        .select("*")
-        .eq("invite_code", normalizedInviteCode)
-        .maybeSingle();
-      if (groupError || !groupRow) {
-        throw withRpcFallbackMessage("Gruppe konnte per Invite-Code nicht gefunden werden", rpcResult.error, groupError ?? new Error("Invite-Code nicht lesbar"));
-      }
-      const { error: joinError } = await supabase.from("group_members").upsert({
-        group_id: String(groupRow.id),
-        user_id: user.id,
-        role: "member"
-      }, { onConflict: "group_id,user_id" });
-      if (joinError) throw withRpcFallbackMessage("Gruppe konnte nicht beigetreten werden", rpcResult.error, joinError);
-      next = fromGroupRow({ ...groupRow, member_count: Number(groupRow.member_count ?? 0) + 1 }, "member");
-    } else {
-      next = fromGroupRow(rpcResult.data as Record<string, unknown>, "member");
+    const normalizedInviteCode = normalizeInviteCode(inviteCode);
+    if (!normalizedInviteCode) {
+      throw new Error(language === "en" ? "Please enter a valid invite code." : "Bitte gib einen gültigen Einladungs-Code ein.");
     }
 
+    const existing = groups.find((item) => item.inviteCode.toUpperCase() === normalizedInviteCode);
+    if (existing) return existing;
+
+    const rpcResult = await supabase.rpc("join_group_by_invite", {
+      p_invite_code: normalizedInviteCode
+    }).single();
+    if (rpcResult.error) {
+      if (import.meta.env.DEV) console.warn("Tusiger join group failed", rpcResult.error);
+      const legacyResult = await supabase.rpc("join_tusiger_group", { p_invite_code: normalizedInviteCode }).single();
+      if (legacyResult.error) {
+        if (import.meta.env.DEV) console.warn("Tusiger legacy join group failed", legacyResult.error);
+        throw new Error(friendlyGroupError(legacyResult.error.message.includes("group_not_found") ? legacyResult.error : rpcResult.error, language, "join"));
+      }
+      const legacyGroup = fromGroupRow(legacyResult.data as Record<string, unknown>, "member");
+      await trackEvent("group_joined", { inviteCode: normalizedInviteCode });
+      setGroups((current) => [legacyGroup, ...current.filter((item) => item.id !== legacyGroup.id)]);
+      setPublicGroups((current) => current.filter((item) => item.id !== legacyGroup.id));
+      await refreshData();
+      return legacyGroup;
+    }
+
+    const next = fromGroupRow(rpcResult.data as Record<string, unknown>, "member");
     await trackEvent("group_joined", { inviteCode: normalizedInviteCode });
     setGroups((current) => [next, ...current.filter((item) => item.id !== next.id)]);
     setPublicGroups((current) => current.filter((item) => item.id !== next.id));
+    await refreshData();
     return next;
-  }, [trackEvent, user]);
+  }, [groups, language, refreshData, trackEvent, user]);
 
   const leaveGroup = useCallback(async (groupId: string) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
     const { error } = await supabase.rpc("leave_tusiger_group", { p_group_id: groupId });
-    if (error) throw error;
+    if (error) {
+      if (import.meta.env.DEV) console.warn("Tusiger leave group failed", error);
+      throw new Error(friendlyGroupError(error, language, "leave"));
+    }
     setGroups((current) => current.filter((item) => item.id !== groupId));
     await trackEvent("group_left", { groupId });
     await refreshData();
-  }, [refreshData, trackEvent, user]);
+  }, [language, refreshData, trackEvent, user]);
 
   const deleteAccount = useCallback(async () => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");

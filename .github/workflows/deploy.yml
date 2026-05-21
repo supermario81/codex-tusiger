@@ -33,6 +33,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://gmbtkmorvretjwaegkln.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_BASE_URL: ${{ vars.VITE_APP_BASE_URL || 'https://supermario81.github.io/codex-tusiger/' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

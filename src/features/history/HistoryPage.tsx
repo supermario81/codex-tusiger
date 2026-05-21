@@ -6,7 +6,7 @@ import { GlassPanel } from "../../components/ui/Card";
 import { historyFallback } from "../../data/challenge";
 import { useApp } from "../../app/AppContext";
 
-const twintQrPayload = "02:c5dfc37fcf134ad28b36005377d01f7e#1ab4b010c0e4a69e123ca110cad2a863b3a07420#";
+export const TWINT_DONATION_URL = "https://sbs.twint.ch/sbs/webshop/v2/payment?nocache=a01d4353-a17b-448a-90f3-971f3413a795&returnAppScheme=twint-issuer2#token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJlMjQwMzk5OTMwYWY0NGI0YjkxNGMxN2FjMjE5NTFiMCIsIm5iZiI6MTc3OTM5NDk3MywiZXhwIjoxNzc5Mzk1OTMzLCJpYXQiOjE3NzkzOTQ5NzN9.gBpEY8gKVEpUGCwpeffvFUoOWtKLlxvT2XyHRsTqcS3yOu0FnG3xszDf22QmvwP3_FtJAqBpp6cJvIzQHPLzumNPvLycHW4484k45Ol-4SXtmVqbgtSPRCbU-7kLwAiQepTlaDs3qFvPnYG8wZlkTL82OOnQK_qwcZZ8Rt_cwTySLA_QE6sASqcJmtOoOOYrcWbVHlfUDEa2L8pe9d2blWBemyefwxAFrstXyB4oasZRDiFDvbrwjUhQAKzlN3lXWzq0QRnf4BIpLebU61Ik99JVU_-Z75yP2zgJxTlmIShX4f21JaPDnEAzjcb_7nJfIYvscVuWlUGvx0aGBPpSqQ";
 const articleUrl = "https://lenzburger-nachrichten.ch/zofingen/detail/die-born-ranger-unterhalten-seit-39-jahren-hoerbis-vermaechtnis";
 
 export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) {
@@ -14,7 +14,7 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
   const { config, history, language, trackEvent } = useApp();
   const baseUrl = import.meta.env.BASE_URL;
   const qrImageUrl = `${baseUrl}images/twint-1000er-staegli.jpg`;
-  const donationHref = config.donationUrl && !config.donationUrl.includes("example.org") ? config.donationUrl : qrImageUrl;
+  const donationHref = config.donationUrl && !config.donationUrl.includes("example.org") ? config.donationUrl : TWINT_DONATION_URL;
   const t = language === "en" ? {
     eyebrow: "1000er-Stägli",
     title: "Since 1904 above the A1 at Born",
@@ -51,7 +51,7 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
   }, [focusDonate, trackEvent]);
 
   function handleDonateClick() {
-    navigator.clipboard?.writeText(twintQrPayload).catch(() => undefined);
+    window.open(donationHref, "_blank", "noopener,noreferrer");
     void trackEvent("donation_clicked", { target: donationHref });
   }
 
@@ -100,7 +100,10 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
             />
             <span>{t.qr}</span>
           </div>
-          <a href={donationHref} target="_blank" rel="noreferrer" onClick={handleDonateClick}>
+          <a href={donationHref} target="_blank" rel="noreferrer" onClick={(event) => {
+            event.preventDefault();
+            handleDonateClick();
+          }}>
             <Button icon={<ExternalLink />}>{t.cta}</Button>
           </a>
         </GlassPanel>

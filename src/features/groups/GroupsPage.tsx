@@ -7,11 +7,19 @@ import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { formatDuration } from "../../lib/geo/geo";
-import { clearPendingInviteCode, createInviteUrl, normalizeInviteCode } from "../../lib/community/community";
+import { clearPendingInviteCode, getInviteUrl, normalizeInviteCode } from "../../lib/community/community";
 
 function errorText(cause: unknown, fallback: string) {
-  if (cause instanceof Error && cause.message) return cause.message;
-  if (cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string") return cause.message;
+  const message = cause instanceof Error
+    ? cause.message
+    : cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string"
+      ? cause.message
+      : "";
+  if (message.includes("Eine Gruppe mit diesem Namen existiert bereits") || message.includes("A group with this name already exists")) return message;
+  if (message.includes("Zu diesem Einladungs-Code") || message.includes("No group was found")) return message;
+  if (message.includes("gültigen Einladungs-Code") || message.includes("valid invite code")) return message;
+  if (message.includes("Gruppenfunktion") || message.includes("group feature")) return message;
+  if (message) return fallback;
   return fallback;
 }
 
@@ -30,12 +38,19 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     created: "Group created.",
     createdError: "Group could not be created.",
     duplicateName: "This group name already exists.",
+    invalidName: "Group name must be 3–40 characters.",
     joinError: "Could not join group.",
     joined: "You joined the group.",
+    alreadyMember: "You are already a member of this group.",
     invite: "Invite link",
     copy: "Copy link",
+    copied: "Copied",
+    copiedToast: "Invite link copied",
+    manualCopy: "Select and copy this link",
     joinCta: "Join group",
     ready: "Ready to join with code",
+    goGroup: "To group",
+    goHome: "To start",
     privateGroup: "Closed group",
     publicGroup: "Public group",
     members: "Members",
@@ -66,12 +81,19 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     created: "Gruppe wurde erstellt.",
     createdError: "Gruppe konnte nicht erstellt werden.",
     duplicateName: "Dieser Gruppenname ist bereits vergeben.",
+    invalidName: "Gruppenname muss 3–40 Zeichen lang sein.",
     joinError: "Gruppe konnte nicht beigetreten werden.",
     joined: "Du bist der Gruppe beigetreten.",
+    alreadyMember: "Du bist bereits Mitglied dieser Gruppe.",
     invite: "Einladungslink",
     copy: "Link kopieren",
+    copied: "Kopiert",
+    copiedToast: "Einladungslink kopiert",
+    manualCopy: "Link markieren und kopieren",
     joinCta: "Gruppe beitreten",
     ready: "Bereit zum Beitreten mit Code",
+    goGroup: "Zur Gruppe",
+    goHome: "Zur Startseite",
     privateGroup: "Geschlossene Gruppe",
     publicGroup: "Öffentliche Gruppe",
     members: "Mitglieder",
@@ -98,6 +120,10 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [autoJoinedCode, setAutoJoinedCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState("");
+  const [manualCopyUrl, setManualCopyUrl] = useState("");
+  const [joinedGroupId, setJoinedGroupId] = useState("");
   const group = groups.find((item) => item.id === groupId) ?? groups[0];
   const groupNames = useMemo(() => [...groups, ...publicGroups].map((item) => item.name.trim().toLowerCase()), [groups, publicGroups]);
   const publicGroupRows = useMemo(() => {
@@ -108,33 +134,73 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
 
   useEffect(() => {
     if (mode !== "invite" || !inviteCode || autoJoinedCode === inviteCode) return;
+    const code = normalizeInviteCode(inviteCode);
+    if (!code) return;
     setAutoJoinedCode(inviteCode);
-    joinGroup(normalizeInviteCode(inviteCode))
+    const existing = groups.find((item) => item.inviteCode.toUpperCase() === code);
+    if (existing) {
+      clearPendingInviteCode();
+      setInvite("");
+      setJoinedGroupId(existing.id);
+      setSuccess(`${t.alreadyMember} ${existing.name}`);
+      return;
+    }
+    setBusy(true);
+    void joinGroup(code)
       .then((next) => {
         clearPendingInviteCode();
-        setInvite(next.inviteCode);
-        setSuccess(t.joined);
+        setInvite("");
+        setJoinedGroupId(next.id);
+        setSuccess(`${t.joined} ${next.name}`);
       })
-      .catch((cause) => setError(errorText(cause, t.joinError)));
-  }, [autoJoinedCode, inviteCode, joinGroup, mode, t.joinError, t.joined]);
+      .catch((cause) => setError(errorText(cause, t.joinError)))
+      .finally(() => setBusy(false));
+  }, [autoJoinedCode, groups, inviteCode, joinGroup, mode, t.alreadyMember, t.joinError, t.joined]);
+
+  async function copyInviteLink(code: string) {
+    const url = getInviteUrl(code);
+    setManualCopyUrl("");
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard_unavailable");
+      await navigator.clipboard.writeText(url);
+      setCopied(code);
+      setSuccess(t.copiedToast);
+      window.setTimeout(() => setCopied((current) => current === code ? "" : current), 2000);
+    } catch {
+      setManualCopyUrl(url);
+      setSuccess(t.manualCopy);
+      window.setTimeout(() => {
+        const field = document.querySelector<HTMLInputElement>("[data-invite-copy-field]");
+        field?.focus();
+        field?.select();
+      }, 50);
+    }
+  }
 
   async function submitGroup(event: FormEvent) {
     event.preventDefault();
     setError("");
     setSuccess("");
+    setJoinedGroupId("");
     const cleanName = name.trim();
-    if (!cleanName) return;
+    if (cleanName.length < 3 || cleanName.length > 40) {
+      setError(t.invalidName);
+      return;
+    }
     if (groupNames.includes(cleanName.toLowerCase())) {
       setError(t.duplicateName);
       return;
     }
     try {
+      setBusy(true);
       const next = await createGroup({ name: cleanName, description: "", isPrivate });
       setInvite(next.inviteCode);
       setName("");
       setSuccess(t.created);
     } catch (cause) {
       setError(errorText(cause, t.createdError));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -142,24 +208,50 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     event.preventDefault();
     setError("");
     setSuccess("");
-    try {
-      const next = await joinGroup(normalizeInviteCode(invite || inviteCode || ""));
+    setJoinedGroupId("");
+    const code = normalizeInviteCode(invite || inviteCode || "");
+    const existing = groups.find((item) => item.inviteCode.toUpperCase() === code);
+    if (existing) {
       clearPendingInviteCode();
       setInvite("");
+      setJoinedGroupId(existing.id);
+      setSuccess(`${t.alreadyMember} ${existing.name}`);
+      return;
+    }
+    try {
+      setBusy(true);
+      const next = await joinGroup(code);
+      clearPendingInviteCode();
+      setInvite("");
+      setJoinedGroupId(next.id);
       setSuccess(`${t.joined} ${next.name}`);
     } catch (cause) {
       setError(errorText(cause, t.joinError));
+    } finally {
+      setBusy(false);
     }
+  }
+
+  async function joinCurrentInvite() {
+    await submitJoin({ preventDefault() { /* no form submit in invite-only CTA */ } } as FormEvent);
   }
 
   async function joinPublic(inviteCodeToJoin: string) {
     setError("");
     setSuccess("");
+    const existing = groups.find((item) => item.inviteCode.toUpperCase() === normalizeInviteCode(inviteCodeToJoin));
+    if (existing) {
+      setSuccess(`${t.alreadyMember} ${existing.name}`);
+      return;
+    }
     try {
+      setBusy(true);
       const next = await joinGroup(normalizeInviteCode(inviteCodeToJoin));
       setSuccess(`${t.joined} ${next.name}`);
     } catch (cause) {
       setError(errorText(cause, t.joinError));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -167,11 +259,14 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     setError("");
     setSuccess("");
     try {
+      setBusy(true);
       await leaveGroup(id);
       setSuccess(t.left);
       if (mode === "detail") navigate("/groups");
     } catch (cause) {
       setError(errorText(cause, language === "en" ? "Could not leave group." : "Gruppe konnte nicht verlassen werden."));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -195,13 +290,14 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
               </div>
               {error ? <p className="form-error">{error}</p> : null}
               {success ? <p className="form-success">{success}</p> : null}
-              <Button icon={<Plus />}>{t.createCta}</Button>
+              <Button icon={<Plus />} disabled={busy}>{t.createCta}</Button>
             </form>
             {invite ? (
               <div className="invite-result">
                 <p>{t.invite}</p>
-                <strong>{createInviteUrl(window.location.origin, window.location.pathname, invite)}</strong>
-                <Button variant="secondary" icon={<Copy />} onClick={() => navigator.clipboard?.writeText(createInviteUrl(window.location.origin, window.location.pathname, invite))}>{t.copy}</Button>
+                <strong>{getInviteUrl(invite)}</strong>
+                <Button variant="secondary" icon={<Copy />} onClick={() => void copyInviteLink(invite)}>{copied === invite ? t.copied : t.copy}</Button>
+                {manualCopyUrl ? <input className="copy-fallback" data-invite-copy-field readOnly value={manualCopyUrl} /> : null}
               </div>
             ) : null}
           </GlassPanel>
@@ -217,16 +313,27 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
           <h1>{t.join}</h1>
           <GlassPanel>
             {mode === "invite" && inviteCode ? (
-              <p>{success || (invite ? `${t.ready} ${invite.toUpperCase()}` : `${t.joinCta}...`)}</p>
+              <div className="join-success-panel">
+                {error ? <p className="form-error">{error}</p> : null}
+                {success ? <p className="form-success">{success}</p> : <p>{busy ? `${t.joinCta}...` : `${t.ready} ${normalizeInviteCode(inviteCode)}`}</p>}
+                {joinedGroupId ? (
+                  <>
+                    <Button onClick={() => navigate(`/groups/${joinedGroupId}`)}>{t.goGroup}</Button>
+                    <Button variant="secondary" onClick={() => navigate("/start")}>{t.goHome}</Button>
+                  </>
+                ) : (
+                  <Button icon={<UserRoundPlus />} disabled={busy} onClick={() => void joinCurrentInvite()}>{t.joinCta}</Button>
+                )}
+              </div>
             ) : (
               <form onSubmit={submitJoin}>
                 <Input label={t.inviteCode} placeholder={t.invitePlaceholder} value={invite || inviteCode || ""} onChange={(event) => setInvite(event.currentTarget.value)} />
                 {error ? <p className="form-error">{error}</p> : null}
                 {success ? <p className="form-success">{success}</p> : null}
-                <Button icon={<UserRoundPlus />}>{t.joinCta}</Button>
+                {joinedGroupId ? <Button variant="secondary" onClick={() => navigate(`/groups/${joinedGroupId}`)}>{t.goGroup}</Button> : null}
+                <Button icon={<UserRoundPlus />} disabled={busy}>{t.joinCta}</Button>
               </form>
             )}
-            {error ? <p className="form-error">{error}</p> : null}
           </GlassPanel>
         </section>
       </PageShell>
@@ -255,8 +362,9 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
             <p>{t.inviteCode} <strong>{group.inviteCode}</strong></p>
             {error ? <p className="form-error">{error}</p> : null}
             {success ? <p className="form-success">{success}</p> : null}
-            <Button variant="secondary" icon={<Copy />} onClick={() => navigator.clipboard?.writeText(createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode))}>{t.copy}</Button>
-            <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
+            <Button variant="secondary" icon={<Copy />} onClick={() => void copyInviteLink(group.inviteCode)}>{copied === group.inviteCode ? t.copied : t.copy}</Button>
+            {manualCopyUrl ? <input className="copy-fallback" data-invite-copy-field readOnly value={manualCopyUrl} /> : null}
+            <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${getInviteUrl(group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
             <Button variant="danger" icon={<LogOut />} onClick={() => void leaveCurrentGroup(group.id)}>{t.leave}</Button>
           </GlassPanel>
         </section>
@@ -291,8 +399,8 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
               <span className="round-icon"><UsersRound /></span>
               <strong>{item.name}<small>{item.memberCount} {t.members}</small></strong>
               {isMember
-                ? <Button variant="secondary" onClick={() => void leaveCurrentGroup(item.id)}>{t.leave}</Button>
-                : <Button variant="secondary" onClick={() => void joinPublic(item.inviteCode)}>{t.joinCta}</Button>}
+                ? <Button variant="secondary" disabled={busy} onClick={() => void leaveCurrentGroup(item.id)}>{t.leave}</Button>
+                : <Button variant="secondary" disabled={busy} onClick={() => void joinPublic(item.inviteCode)}>{t.joinCta}</Button>}
             </article>
           ))}
           {error ? <p className="form-error">{error}</p> : null}

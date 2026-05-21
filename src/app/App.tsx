@@ -41,12 +41,6 @@ function Gate({ children }: { children: React.ReactNode }) {
     return <Navigate to="/setup-profile" replace state={{ from: location.pathname }} />;
   }
 
-  const pendingInviteCode = readPendingInviteCode();
-  const pendingInvitePath = pendingInviteCode ? "/join/" + pendingInviteCode : "";
-  if (pendingInvitePath && location.pathname !== pendingInvitePath) {
-    return <Navigate to={pendingInvitePath} replace />;
-  }
-
   return children;
 }
 

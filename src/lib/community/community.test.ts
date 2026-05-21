@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInviteUrl, filterLeaderboardByTab, normalizeInviteCode } from "./community";
+import { filterLeaderboardByTab, getInviteUrl, normalizeInviteCode, parseInviteInput } from "./community";
 import type { PublicRun } from "../types";
 
 const runs: PublicRun[] = [
@@ -12,12 +12,16 @@ describe("community helpers", () => {
     expect(filterLeaderboardByTab(runs, "Heute", new Date("2026-05-19T12:00:00Z"))).toHaveLength(1);
   });
 
-  it("normalizes invite codes", () => {
-    expect(normalizeInviteCode(" ab-12 ")).toBe("AB12");
+  it("extracts invite codes from code-only and full links", () => {
+    expect(parseInviteInput("TUS5D29A02B")).toBe("TUS5D29A02B");
+    expect(parseInviteInput("tus5d29a02b")).toBe("TUS5D29A02B");
     expect(normalizeInviteCode("https://supermario81.github.io/codex-tusiger/#/join/TUSAB12CD")).toBe("TUSAB12CD");
+    expect(normalizeInviteCode("https://supermario81.github.io/codex-tusiger/images/twint-1000er-staegli.jpg#/join/TUS956F42A4")).toBe("TUS956F42A4");
   });
 
-  it("creates hash invite URLs for GitHub Pages", () => {
-    expect(createInviteUrl("https://supermario81.github.io", "/codex-tusiger/", "ab12")).toBe("https://supermario81.github.io/codex-tusiger/#/join/AB12");
+  it("creates hash invite URLs without leaking asset paths", () => {
+    expect(getInviteUrl("TUS956F42A4")).toContain("#/join/TUS956F42A4");
+    expect(getInviteUrl("https://supermario81.github.io/codex-tusiger/images/twint-1000er-staegli.jpg#/join/TUS5D29A02B")).toContain("#/join/TUS5D29A02B");
+    expect(getInviteUrl("https://supermario81.github.io/codex-tusiger/images/twint-1000er-staegli.jpg#/join/TUS5D29A02B")).not.toContain("twint-1000er-staegli.jpg");
   });
 });
