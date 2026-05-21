@@ -27,7 +27,7 @@ export function fromConfigRow(row: Record<string, unknown>): ChallengeConfig {
   return {
     id: String(row.id),
     name: String(row.name),
-    totalSteps: Number(row.total_steps),
+    totalSteps: Math.max(1150, Number(row.total_steps) || 1150),
     startLat: Number(row.start_lat),
     startLng: Number(row.start_lng),
     startRadiusM: Number(row.start_radius_m),

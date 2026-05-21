@@ -450,7 +450,7 @@ form { display: grid; gap: 16px; }
   border: 0;
 }
 .avatar-upload input { display: none; }
-.avatar-upload > span {
+.avatar-upload-action {
   position: absolute;
   right: -4px;
   bottom: 8px;
@@ -836,6 +836,27 @@ form { display: grid; gap: 16px; }
   border-radius: 20px;
   margin-bottom: 8px;
 }
+.public-group-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.28);
+}
+.public-group-row .button {
+  width: auto;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 16px;
+  font-size: .95rem;
+}
+.public-group-row small {
+  display: block;
+  font-size: .82rem;
+  font-weight: 500;
+}
 .top-group { padding: 22px; }
 .top-group p { display: flex; justify-content: space-between; }
 
@@ -956,7 +977,7 @@ form { display: grid; gap: 16px; }
   cursor: pointer;
 }
 .profile-avatar-edit input { display: none; }
-.profile-avatar-edit > span {
+.profile-avatar-action {
   position: absolute;
   right: 2px;
   bottom: 10px;

@@ -66,7 +66,7 @@ export function ProfilePage() {
         <GlassPanel className="profile-card">
           <label className="profile-avatar-edit">
             <Avatar name={currentProfile.nickname} url={currentProfile.avatarUrl} size="lg" />
-            <span><ImagePlus /></span>
+            <span className="profile-avatar-action"><ImagePlus /></span>
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatar} />
           </label>
           <h2>{currentProfile.nickname}</h2>

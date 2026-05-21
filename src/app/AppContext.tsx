@@ -19,6 +19,7 @@ type AppContextValue = {
   config: ChallengeConfig;
   runs: RunRecord[];
   groups: Group[];
+  publicGroups: Group[];
   leaderboard: PublicRun[];
   history: HistoryItem[];
   legalPages: LegalPage[];
@@ -30,6 +31,7 @@ type AppContextValue = {
   saveRun: (run: RunRecord) => Promise<void>;
   createGroup: (group: Pick<Group, "name" | "description" | "isPrivate">) => Promise<Group>;
   joinGroup: (inviteCode: string) => Promise<Group>;
+  leaveGroup: (groupId: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   trackEvent: (eventName: string, metadata?: Record<string, unknown>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -120,6 +122,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [publicGroups, setPublicGroups] = useState<Group[]>([]);
   const [leaderboard, setLeaderboard] = useState<PublicRun[]>([]);
   const [config, setConfig] = useState<ChallengeConfig>(defaultChallengeConfig);
   const [history, setHistory] = useState<HistoryItem[]>(historyFallback);
@@ -179,12 +182,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         setRuns([]);
         setGroups([]);
+        setPublicGroups([]);
       } else {
         const user_id = currentSession.user.id;
-        const [{ data: profileRows }, { data: runRows }, { data: memberRows }] = await Promise.all([
+        const [{ data: profileRows }, { data: runRows }, myGroupsResult, publicGroupsResult] = await Promise.all([
           supabase.from("profiles").select("*").eq("user_id", user_id).is("deleted_at", null).limit(1),
           supabase.from("runs").select("*").eq("user_id", user_id).order("started_at", { ascending: false }),
-          supabase.from("group_members").select("role, groups(*)").eq("user_id", user_id)
+          supabase.rpc("list_my_groups"),
+          supabase.rpc("list_public_groups")
         ]);
         const nextProfile = profileRows?.[0] ? fromProfileRow(profileRows[0]) : null;
         setProfile(nextProfile);
@@ -193,10 +198,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         const nextRuns = (runRows ?? []).map(fromRunRow);
         setRuns(nextRuns);
-        setGroups((memberRows ?? []).flatMap((row) => {
-          const groupRow = Array.isArray(row.groups) ? row.groups[0] : row.groups;
-          return groupRow ? [fromGroupRow(groupRow as unknown as Record<string, unknown>, String(row.role))] : [];
-        }));
+        const nextGroups: Group[] = myGroupsResult.error ? [] : ((myGroupsResult.data ?? []) as Record<string, unknown>[]).map((row) => fromGroupRow(row, String(row.role ?? "member")));
+        setGroups(nextGroups);
+        const memberIds = new Set(nextGroups.map((item) => item.id));
+        setPublicGroups(
+          publicGroupsResult.error
+            ? []
+            : ((publicGroupsResult.data ?? []) as Record<string, unknown>[])
+              .map((row) => fromGroupRow(row, String(row.role ?? "member")))
+              .filter((item) => !memberIds.has(item.id))
+        );
       }
 
       const { data: leaderboardRows } = await supabase
@@ -224,6 +235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setProfile(null);
       setRuns([]);
       setGroups([]);
+      setPublicGroups([]);
       setLeaderboard([]);
     } finally {
       setReady(true);
@@ -350,38 +362,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const createGroup = useCallback(async (groupInput: Pick<Group, "name" | "description" | "isPrivate">) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-    const { data, error } = await supabase
-      .from("groups")
-      .insert({
-        owner_user_id: user.id,
-        name: groupInput.name,
-        description: groupInput.description,
-        invite_code: inviteCode,
-        is_private: groupInput.isPrivate
-      })
-      .select("*")
-      .single();
+    const { data, error } = await supabase.rpc("create_tusiger_group", {
+      p_name: groupInput.name,
+      p_is_private: groupInput.isPrivate
+    }).single();
     if (error) throw error;
-    const { error: memberError } = await supabase.from("group_members").insert({ group_id: data.id, user_id: user.id, role: "owner" });
-    if (memberError) throw memberError;
     await trackEvent("group_created");
-    const group = fromGroupRow(data, "owner");
+    const group = fromGroupRow(data as Record<string, unknown>, "owner");
     setGroups((current) => [group, ...current]);
+    setPublicGroups((current) => current.filter((item) => item.id !== group.id));
     return group;
   }, [trackEvent, user]);
 
   const joinGroup = useCallback(async (inviteCode: string) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    const { data: group, error } = await supabase.from("groups").select("*").eq("invite_code", inviteCode.toUpperCase()).single();
-    if (error) throw new Error("Invite-Code nicht gefunden.");
-    const { error: joinError } = await supabase.from("group_members").upsert({ group_id: group.id, user_id: user.id, role: "member" }, { onConflict: "group_id,user_id" });
-    if (joinError) throw joinError;
+    const { data: group, error } = await supabase.rpc("join_tusiger_group", {
+      p_invite_code: inviteCode.toUpperCase()
+    }).single();
+    if (error) throw error;
     await trackEvent("group_joined", { inviteCode });
-    const next = fromGroupRow(group, "member");
+    const next = fromGroupRow(group as Record<string, unknown>, "member");
     setGroups((current) => [next, ...current.filter((item) => item.id !== next.id)]);
+    setPublicGroups((current) => current.filter((item) => item.id !== next.id));
     return next;
   }, [trackEvent, user]);
+
+  const leaveGroup = useCallback(async (groupId: string) => {
+    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    const { error } = await supabase.rpc("leave_tusiger_group", { p_group_id: groupId });
+    if (error) throw error;
+    setGroups((current) => current.filter((item) => item.id !== groupId));
+    await trackEvent("group_left", { groupId });
+    await refreshData();
+  }, [refreshData, trackEvent, user]);
 
   const deleteAccount = useCallback(async () => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
@@ -410,6 +423,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       config,
       runs,
       groups,
+      publicGroups,
       leaderboard,
       history,
       legalPages,
@@ -421,11 +435,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       saveRun,
       createGroup,
       joinGroup,
+      leaveGroup,
       deleteAccount,
       trackEvent,
       refreshData
     }),
-    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, legalPages, loginWithEmail, logout, profile, ready, refreshData, runs, saveProfile, saveRun, session, setLanguage, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
+    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, leaveGroup, legalPages, loginWithEmail, logout, profile, publicGroups, ready, refreshData, runs, saveProfile, saveRun, session, setLanguage, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

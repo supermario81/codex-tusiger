@@ -1,4 +1,8 @@
+import { useApp } from "../../app/AppContext";
+
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const { language } = useApp();
+
   return (
     <div className={`logo ${compact ? "logo-compact" : ""}`} aria-label="Tusiger">
       <svg className="tusiger-mark" viewBox="0 0 96 96" role="img" aria-label="Tusiger Treppenlogo">
@@ -8,7 +12,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
       {!compact ? (
         <>
           <span>TUSIGER</span>
-          <em>1150 Stufen. Deine Zeit.</em>
+          <em>{language === "en" ? "1150 steps. Your time." : "1150 Stufen. Deine Zeit."}</em>
         </>
       ) : null}
     </div>

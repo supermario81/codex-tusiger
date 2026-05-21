@@ -1,6 +1,6 @@
 import { ArrowLeft, LockKeyhole, LogOut, MailCheck, Send } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { Logo } from "../../components/layout/Logo";
 import { PageShell } from "../../components/layout/PageShell";
@@ -65,6 +65,10 @@ const copy = {
 export function LoginPage() {
   const { language, loginWithEmail, logout, profile, setupError, user, verifyOtp } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPath = typeof location.state === "object" && location.state && "from" in location.state && typeof location.state.from === "string"
+    ? location.state.from
+    : "/";
   const t = copy[language];
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -105,7 +109,7 @@ export function LoginPage() {
     setError("");
     try {
       await verifyOtp(email, otp);
-      navigate(profile ? "/" : "/setup-profile");
+      navigate(fromPath);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t.invalidCode);
     } finally {
@@ -126,7 +130,7 @@ export function LoginPage() {
             <div className="sent-icon"><MailCheck /></div>
             <h2>{profile?.nickname ?? user.email}</h2>
             <p>{t.currentSession} <strong>{user.email}</strong>.</p>
-            <Button onClick={() => navigate(profile ? "/" : "/setup-profile")}>{t.continue}</Button>
+            <Button onClick={() => navigate(profile ? fromPath : "/setup-profile", { state: { from: fromPath } })}>{t.continue}</Button>
             <Button variant="secondary" icon={<LogOut />} onClick={logout}>{t.switchAccount}</Button>
           </GlassPanel>
         ) : null}

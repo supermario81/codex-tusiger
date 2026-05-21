@@ -1,6 +1,6 @@
 import { ChevronRight, Copy, LogOut, Plus, UsersRound, UserRoundPlus } from "lucide-react";
-import { FormEvent, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
@@ -10,7 +10,8 @@ import { formatDuration } from "../../lib/geo/geo";
 import { createInviteUrl, normalizeInviteCode } from "../../lib/community/community";
 
 export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invite" }) {
-  const { config, createGroup, groups, joinGroup, language } = useApp();
+  const { config, createGroup, groups, joinGroup, language, leaveGroup, publicGroups } = useApp();
+  const navigate = useNavigate();
   const t = language === "en" ? {
     create: "Create group",
     join: "Join",
@@ -39,6 +40,8 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     yourGroups: "Your groups",
     active: "Active",
     best: "Best time",
+    publicGroups: "Public groups",
+    noGroups: "No groups yet.",
     topGroup: "Top group",
     thisWeek: "This week",
     steps: "steps"
@@ -70,6 +73,8 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     yourGroups: "Deine Gruppen",
     active: "Aktiv",
     best: "Bestzeit",
+    publicGroups: "Öffentliche Gruppen",
+    noGroups: "Noch keine Gruppen.",
     topGroup: "Top Gruppe",
     thisWeek: "Diese Woche",
     steps: "Stufen"
@@ -79,7 +84,16 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
   const [isPrivate, setIsPrivate] = useState(true);
   const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
+  const [autoJoinedCode, setAutoJoinedCode] = useState("");
   const group = groups.find((item) => item.id === groupId) ?? groups[0];
+
+  useEffect(() => {
+    if (mode !== "invite" || !inviteCode || autoJoinedCode === inviteCode) return;
+    setAutoJoinedCode(inviteCode);
+    joinGroup(normalizeInviteCode(inviteCode))
+      .then((next) => setInvite(next.inviteCode))
+      .catch((cause) => setError(cause instanceof Error ? cause.message : t.joinError));
+  }, [autoJoinedCode, inviteCode, joinGroup, mode, t.joinError]);
 
   async function submitGroup(event: FormEvent) {
     event.preventDefault();
@@ -103,6 +117,25 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
       setInvite(next.inviteCode);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t.joinError);
+    }
+  }
+
+  async function joinPublic(inviteCodeToJoin: string) {
+    setError("");
+    try {
+      await joinGroup(normalizeInviteCode(inviteCodeToJoin));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t.joinError);
+    }
+  }
+
+  async function leaveCurrentGroup(id: string) {
+    setError("");
+    try {
+      await leaveGroup(id);
+      navigate("/groups");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Gruppe konnte nicht verlassen werden.");
     }
   }
 
@@ -146,12 +179,16 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
         <section className="simple-page">
           <h1>{t.join}</h1>
           <GlassPanel>
-            <form onSubmit={submitJoin}>
-              <Input label="Invite-Code" placeholder="GIPFEL" value={invite || inviteCode || ""} onChange={(event) => setInvite(event.currentTarget.value)} />
-              {error ? <p className="form-error">{error}</p> : null}
-              <Button icon={<UserRoundPlus />}>{t.joinCta}</Button>
-            </form>
-            {invite ? <p className="helper-line">{t.ready} {invite.toUpperCase()}</p> : null}
+            {mode === "invite" && inviteCode ? (
+              <p>{invite ? `${t.ready} ${invite.toUpperCase()}` : `${t.joinCta}...`}</p>
+            ) : (
+              <form onSubmit={submitJoin}>
+                <Input label="Invite-Code" placeholder="GIPFEL" value={invite || inviteCode || ""} onChange={(event) => setInvite(event.currentTarget.value)} />
+                {error ? <p className="form-error">{error}</p> : null}
+                <Button icon={<UserRoundPlus />}>{t.joinCta}</Button>
+              </form>
+            )}
+            {error ? <p className="form-error">{error}</p> : null}
           </GlassPanel>
         </section>
       </PageShell>
@@ -159,6 +196,17 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
   }
 
   if (mode === "detail") {
+    if (!group) {
+      return (
+        <PageShell back>
+          <section className="simple-page">
+            <h1>{t.groups}</h1>
+            <GlassPanel><p>{t.noGroups}</p></GlassPanel>
+          </section>
+        </PageShell>
+      );
+    }
+
     return (
       <PageShell back>
         <section className="simple-page">
@@ -167,9 +215,10 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
           <GlassPanel className="group-detail">
             <p>{t.members} <strong>{group.memberCount}</strong></p>
             <p>{t.inviteCode} <strong>{group.inviteCode}</strong></p>
+            {error ? <p className="form-error">{error}</p> : null}
             <Button variant="secondary" icon={<Copy />} onClick={() => navigator.clipboard?.writeText(createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode))}>{t.copy}</Button>
             <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${createInviteUrl(window.location.origin, window.location.pathname, group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
-            <Button variant="danger" icon={<LogOut />}>{t.leave}</Button>
+            <Button variant="danger" icon={<LogOut />} onClick={() => void leaveCurrentGroup(group.id)}>{t.leave}</Button>
           </GlassPanel>
         </section>
       </PageShell>
@@ -187,7 +236,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
         </div>
         <h2>{t.yourGroups}</h2>
         <GlassPanel className="group-list">
-          {groups.map((item) => (
+          {groups.length === 0 ? <p className="empty-state">{t.noGroups}</p> : groups.map((item) => (
             <Link to={`/groups/${item.id}`} key={item.id}>
               <span className="round-icon"><UsersRound /></span>
               <strong>{item.name}<small>{t.active} · {item.memberCount} {t.members}</small></strong>
@@ -196,6 +245,21 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
             </Link>
           ))}
         </GlassPanel>
+        {publicGroups.length > 0 ? (
+          <>
+            <h2>{t.publicGroups}</h2>
+            <GlassPanel className="group-list">
+              {publicGroups.map((item) => (
+                <article className="public-group-row" key={item.id}>
+                  <span className="round-icon"><UsersRound /></span>
+                  <strong>{item.name}<small>{item.memberCount} {t.members}</small></strong>
+                  <Button variant="secondary" onClick={() => void joinPublic(item.inviteCode)}>{t.join}</Button>
+                </article>
+              ))}
+              {error ? <p className="form-error">{error}</p> : null}
+            </GlassPanel>
+          </>
+        ) : null}
         <GlassPanel className="top-group">
           <small>{t.topGroup}</small>
           <h2>Gipfelstürmer</h2>

@@ -1,6 +1,6 @@
 import { Globe2, ImagePlus, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { Avatar } from "../../components/ui/Avatar";
@@ -46,6 +46,10 @@ export function ProfileSetupPage() {
     steps: "Stufen"
   };
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPath = typeof location.state === "object" && location.state && "from" in location.state && typeof location.state.from === "string"
+    ? location.state.from
+    : "/";
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl ?? "");
   const [error, setError] = useState("");
@@ -90,7 +94,7 @@ export function ProfileSetupPage() {
       return;
     }
     await saveProfile({ nickname: nickname.trim(), avatarUrl, language });
-    navigate("/");
+    navigate(fromPath);
   }
 
   return (
@@ -100,7 +104,7 @@ export function ProfileSetupPage() {
         <p>{t.subtitle}</p>
         <label className="avatar-upload">
           {avatarUrl ? <Avatar name={nickname || "Tusiger"} url={avatarUrl} size="lg" /> : <UserRound aria-hidden />}
-          <span><ImagePlus aria-hidden /></span>
+          <span className="avatar-upload-action"><ImagePlus aria-hidden /></span>
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatar} />
         </label>
         <button className="text-link" type="button" onClick={() => setAvatarUrl("")}>
