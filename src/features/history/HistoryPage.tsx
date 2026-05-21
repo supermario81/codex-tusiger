@@ -1,4 +1,4 @@
-import { ExternalLink, Heart, Mountain, Newspaper, UsersRound } from "lucide-react";
+import { Heart, Mountain, Newspaper, UsersRound } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
@@ -11,10 +11,9 @@ const articleUrl = "https://lenzburger-nachrichten.ch/zofingen/detail/die-born-r
 
 export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) {
   const donationRef = useRef<HTMLDivElement>(null);
-  const { config, history, language, trackEvent } = useApp();
+  const { history, language, trackEvent } = useApp();
   const baseUrl = import.meta.env.BASE_URL;
   const qrImageUrl = `${baseUrl}images/twint-1000er-staegli.jpg`;
-  const donationHref = config.donationUrl && !config.donationUrl.includes("example.org") ? config.donationUrl : TWINT_DONATION_URL;
   const t = language === "en" ? {
     eyebrow: "1000er-Stägli",
     title: "Since 1904 above the A1 at Born",
@@ -25,8 +24,7 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
     donateTitle: "Support maintenance",
     maintenance: "Regular maintenance of the 1000er-Stägli is carried out by a volunteer working group: paths, barbecue areas, firewood, cleaning, material, transport, tools and many hours of physical work.",
     note: "The donation goes directly to the responsible volunteer working group / Born Rangers Team. Tusiger only provides the pointer.",
-    qr: "Official TWINT QR. If the button opens the image, open TWINT and scan the QR code.",
-    cta: "Support via TWINT"
+    qr: "Open TWINT and scan the QR code to make a donation to the Born Rangers in support of their work."
   } : {
     eyebrow: "1000er-Stägli",
     title: "Seit 1904 am Born oberhalb der A1",
@@ -37,8 +35,7 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
     donateTitle: "Unterstütze den Unterhalt",
     maintenance: "Der regelmässige Unterhalt des 1000er-Stäglis wird durch eine freiwillige Arbeitsgruppe geleistet: Wege, Grillstellen, Feuerholz, Reinigung, Material, Transport, Werkzeuge und viele Stunden körperliche Arbeit.",
     note: "Die Spende geht direkt an die zuständige freiwillige Arbeitsgruppe / Born Rangers Team. Tusiger stellt nur den Hinweis bereit.",
-    qr: "Offizieller TWINT QR. Falls der Button das Bild öffnet: TWINT öffnen und den QR-Code scannen.",
-    cta: "Jetzt per TWINT unterstützen"
+    qr: "TWINT öffnen und QR-Code einscannen um eine Spende an die Born Rangers zur Unterstützung zu tätigen."
   };
   const localizedHistory = (history.length > 0 ? history : historyFallback).filter((item) => !item.language || item.language === language);
   const visibleHistory = localizedHistory.length > 0 ? localizedHistory : historyFallback;
@@ -49,11 +46,6 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
     }
     void trackEvent(focusDonate ? "donation_clicked" : "history_viewed");
   }, [focusDonate, trackEvent]);
-
-  function handleDonateClick() {
-    window.open(donationHref, "_blank", "noopener,noreferrer");
-    void trackEvent("donation_clicked", { target: donationHref });
-  }
 
   return (
     <PageShell>
@@ -100,12 +92,6 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
             />
             <span>{t.qr}</span>
           </div>
-          <a href={donationHref} target="_blank" rel="noreferrer" onClick={(event) => {
-            event.preventDefault();
-            handleDonateClick();
-          }}>
-            <Button icon={<ExternalLink />}>{t.cta}</Button>
-          </a>
         </GlassPanel>
       </section>
     </PageShell>

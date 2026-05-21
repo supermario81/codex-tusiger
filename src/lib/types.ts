@@ -63,6 +63,7 @@ export type Profile = {
   nickname: string;
   avatarUrl: string;
   language: "de" | "en";
+  showInPublicLeaderboard: boolean;
   role: "user" | "admin";
   deletedAt?: string | null;
   createdAt: string;

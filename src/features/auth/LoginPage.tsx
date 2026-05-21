@@ -1,5 +1,5 @@
 import { ArrowLeft, LockKeyhole, LogOut, MailCheck, Send } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { Logo } from "../../components/layout/Logo";
@@ -75,6 +75,7 @@ export function LoginPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   async function sendCode(event: FormEvent) {
     event.preventDefault();
@@ -162,18 +163,32 @@ export function LoginPage() {
           <form onSubmit={login}>
             <h2>{t.codeTitle}</h2>
             <p>{sent ? t.inbox : t.sendFirst}</p>
-            <div className="otp-row" aria-hidden>
-              {Array.from({ length: 6 }).map((_, index) => (
-                <span key={index}>{otp[index] ?? "–"}</span>
-              ))}
+            <div
+              className="otp-entry"
+              onClick={() => otpInputRef.current?.focus()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") otpInputRef.current?.focus();
+              }}
+              role="group"
+              aria-label={t.codePlaceholder}
+              tabIndex={-1}
+            >
+              <div className="otp-row" aria-hidden>
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <span className={otp[index] ? "filled" : ""} key={index}>{otp[index] ?? ""}</span>
+                ))}
+              </div>
+              <input
+                ref={otpInputRef}
+                className="otp-input"
+                value={otp}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                aria-label={t.codePlaceholder}
+                onChange={(event) => setOtp(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))}
+              />
             </div>
-            <Input
-              value={otp}
-              inputMode="numeric"
-              maxLength={6}
-              placeholder={t.codePlaceholder}
-              onChange={(event) => setOtp(event.currentTarget.value.replace(/\D/g, ""))}
-            />
             {error ? <p className="form-error">{error}</p> : null}
             <Button disabled={!sent || loading} icon={<LockKeyhole />}>
               {t.login}

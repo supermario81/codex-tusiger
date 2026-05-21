@@ -20,11 +20,12 @@ export function ProfileSetupPage() {
     uploading: "Optimizing and uploading avatar...",
     ready: "Avatar ready.",
     uploadFailed: "Avatar could not be uploaded.",
-    nicknameInvalid: "Nickname needs 3-20 characters and cannot be a placeholder.",
+    nicknameInvalid: "Nickname needs 3-30 characters and cannot be a placeholder.",
     avatarAction: "Change avatar or skip",
     nickname: "Nickname",
     placeholder: "Your nickname",
-    public: "Publicly visible in the leaderboard",
+    public: "Show me in the public leaderboard",
+    publicHint: "Valid runs appear publicly with nickname and avatar. You can change this later in your profile.",
     continue: "Continue",
     preview: "Preview",
     steps: "steps"
@@ -36,11 +37,12 @@ export function ProfileSetupPage() {
     uploading: "Avatar wird optimiert und hochgeladen...",
     ready: "Avatar bereit.",
     uploadFailed: "Avatar konnte nicht hochgeladen werden.",
-    nicknameInvalid: "Nickname braucht 3–20 Zeichen und darf kein Platzhalter sein.",
+    nicknameInvalid: "Nickname braucht 3–30 Zeichen und darf kein Platzhalter sein.",
     avatarAction: "Avatar ändern oder überspringen",
     nickname: "Nickname",
     placeholder: "Dein Nickname",
-    public: "Öffentlich sichtbar in der Rangliste",
+    public: "In öffentlicher Rangliste anzeigen",
+    publicHint: "Gültige Läufe erscheinen öffentlich mit Nickname und Avatar. Du kannst das später im Profil ändern.",
     continue: "Weiter",
     preview: "Vorschau",
     steps: "Stufen"
@@ -52,12 +54,13 @@ export function ProfileSetupPage() {
     : "/";
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl ?? "");
+  const [showInPublicLeaderboard, setShowInPublicLeaderboard] = useState(profile?.showInPublicLeaderboard ?? true);
   const [error, setError] = useState("");
   const [uploadState, setUploadState] = useState("");
 
   const isValid = useMemo(() => {
     const clean = nickname.trim().toLowerCase();
-    return clean.length >= 3 && clean.length <= 20 && !blockedNicknames.includes(clean);
+    return clean.length >= 3 && clean.length <= 30 && !blockedNicknames.includes(clean);
   }, [nickname]);
 
   function handleAvatar(event: ChangeEvent<HTMLInputElement>) {
@@ -93,7 +96,7 @@ export function ProfileSetupPage() {
       setError(t.nicknameInvalid);
       return;
     }
-    await saveProfile({ nickname: nickname.trim(), avatarUrl, language });
+    await saveProfile({ nickname: nickname.trim(), avatarUrl, language, showInPublicLeaderboard });
     navigate(fromPath);
   }
 
@@ -114,19 +117,22 @@ export function ProfileSetupPage() {
           <Input
             label={t.nickname}
             value={nickname}
-            maxLength={20}
+            maxLength={30}
             placeholder={t.placeholder}
-            helper={`${nickname.length} / 20`}
+            helper={`${nickname.length} / 30`}
             error={error}
             onChange={(event) => setNickname(event.currentTarget.value)}
           />
-          <p className="helper-line"><Globe2 size={18} /> {t.public}</p>
+          <label className="toggle-line">
+            <span><Globe2 size={18} /> <strong>{t.public}</strong><small>{t.publicHint}</small></span>
+            <input type="checkbox" checked={showInPublicLeaderboard} onChange={(event) => setShowInPublicLeaderboard(event.currentTarget.checked)} />
+          </label>
           {uploadState ? <p className="helper-line">{uploadState}</p> : null}
         </GlassPanel>
         <Button disabled={!isValid}>{t.continue}</Button>
         <GlassPanel className="preview-card">
           <h2>{t.preview}</h2>
-          <Avatar name={nickname || ""} url={avatarUrl} size="md" />
+          <Avatar name={nickname || t.placeholder} url={avatarUrl} size="md" />
           <div>
             <strong>{nickname || t.placeholder}</strong>
             <span>0 / {config.totalSteps} {t.steps}</span>

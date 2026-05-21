@@ -56,6 +56,7 @@ export function fromProfileRow(row: Record<string, unknown>): Profile {
     nickname: String(row.nickname),
     avatarUrl: String(row.avatar_url ?? ""),
     language: row.language === "en" ? "en" : "de",
+    showInPublicLeaderboard: row.show_in_public_leaderboard === undefined ? true : Boolean(row.show_in_public_leaderboard),
     role: row.role === "admin" ? "admin" : "user",
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     createdAt: String(row.created_at),

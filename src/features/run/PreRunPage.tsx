@@ -1,5 +1,5 @@
-import { Check, Footprints, LocateFixed, MapPin, Mountain, Navigation } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, Footprints, LocateFixed, MapPin, Mountain, Navigation, X } from "lucide-react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
@@ -69,11 +69,11 @@ export function PreRunPage() {
     navigate("/run");
   }
 
-  const rows = [
+  const rows: Array<{ icon: typeof MapPin; label: string; text: ReactNode; ok: boolean }> = [
     { icon: MapPin, label: "Standort", text: point ? "Olten, Schweiz" : message, ok: state === "ready" },
     { icon: Navigation, label: "GPS", text: point ? `± ${Math.round(point.accuracyM)} m Genauigkeit` : "Noch nicht geprüft", ok: Boolean(point && point.accuracyM <= config.gpsAccuracyValidMaxM) },
     { icon: Mountain, label: "Höhe", text: point?.altitudeM ? `${Math.round(point.altitudeM)} m ü. M.` : "Höhe optional", ok: true },
-    { icon: Footprints, label: "Bewegung", text: "Bereit für GPS-Aufzeichnung", ok: true },
+    { icon: Footprints, label: "Bewegung", text: <>Bereit für GPS-<br />Aufzeichnung</>, ok: true },
     { icon: LocateFixed, label: "Startzone", text: distanceToStart === null ? "Unten am Start prüfen" : `${Math.round(distanceToStart)} m entfernt`, ok: canStart }
   ];
 
@@ -89,7 +89,7 @@ export function PreRunPage() {
               <article key={row.label}>
                 <span className="round-icon"><Icon aria-hidden /></span>
                 <div><strong>{row.label}</strong><small>{row.text}</small></div>
-                <span className={`check-dot ${row.ok ? "ok" : "warn"}`}><Check /></span>
+                <span className={`check-dot ${row.ok ? "ok" : "warn"}`}>{row.ok ? <Check /> : <X />}</span>
               </article>
             );
           })}
@@ -99,7 +99,7 @@ export function PreRunPage() {
           <div>
             <small>Startzone</small>
             <strong>Start unten</strong>
-            <span>Zone {canStart ? "aktiv" : "noch nicht aktiv"}</span>
+            <span>Zone<br />{canStart ? "aktiv" : "noch nicht aktiv"}</span>
           </div>
           <p>GPS: {point ? `± ${Math.round(point.accuracyM)} m` : "unbekannt"}</p>
         </GlassPanel>

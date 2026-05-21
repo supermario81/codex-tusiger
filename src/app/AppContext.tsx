@@ -26,7 +26,7 @@ type AppContextValue = {
   legalPages: LegalPage[];
   loginWithEmail: (email: string, language?: "de" | "en") => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<void>;
-  saveProfile: (input: { nickname: string; avatarUrl: string; language: "de" | "en" }) => Promise<void>;
+  saveProfile: (input: { nickname: string; avatarUrl: string; language: "de" | "en"; showInPublicLeaderboard?: boolean }) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
   logout: () => Promise<void>;
   saveRun: (run: RunRecord) => Promise<void>;
@@ -334,7 +334,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return data.publicUrl;
   }, [profile?.avatarUrl, user]);
 
-  const saveProfile = useCallback(async (input: { nickname: string; avatarUrl: string; language: "de" | "en" }) => {
+  const saveProfile = useCallback(async (input: { nickname: string; avatarUrl: string; language: "de" | "en"; showInPublicLeaderboard?: boolean }) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
     const nickname = input.nickname.trim();
     const { data: duplicateProfiles, error: duplicateError } = await supabase
@@ -353,6 +353,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       nickname,
       avatar_url: input.avatarUrl,
       language: input.language,
+      show_in_public_leaderboard: input.showInPublicLeaderboard ?? profile?.showInPublicLeaderboard ?? true,
       role: profile?.role ?? "user",
       deleted_at: null,
       updated_at: new Date().toISOString()
@@ -361,7 +362,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.updateUser({ data: { language: input.language } }).catch(() => undefined);
     await trackEvent("profile_completed");
     await refreshData();
-  }, [profile?.role, refreshData, trackEvent, user]);
+  }, [profile?.role, profile?.showInPublicLeaderboard, refreshData, trackEvent, user]);
 
   const logout = useCallback(async () => {
     localStore.clearActiveRun();
@@ -400,7 +401,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await trackEvent("run_validated", { status: run.status });
     localStore.upsertRun(run);
     setRuns((current) => [run, ...current.filter((item) => item.id !== run.id)]);
-    setLeaderboard((current) => run.status === "valid" ? [publicRunFromRun(run, current.length + 1, profile), ...current] : current);
+    setLeaderboard((current) => run.status === "valid" && profile?.showInPublicLeaderboard !== false ? [publicRunFromRun(run, current.length + 1, profile), ...current] : current);
   }, [profile, trackEvent, user]);
 
   const createGroup = useCallback(async (groupInput: Pick<Group, "name" | "description" | "isPrivate">) => {

@@ -68,7 +68,10 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     best: "Best time",
     publicGroups: "Public groups",
     noGroups: "No groups yet.",
-    noPublicGroups: "No public groups yet."
+    noPublicGroups: "No public groups yet.",
+    previous: "Previous",
+    next: "Next",
+    page: "Page"
   } : {
     create: "Gruppe erstellen",
     join: "Beitreten",
@@ -111,7 +114,10 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     best: "Bestzeit",
     publicGroups: "Öffentliche Gruppen",
     noGroups: "Noch keine Gruppen.",
-    noPublicGroups: "Noch keine öffentlichen Gruppen."
+    noPublicGroups: "Noch keine öffentlichen Gruppen.",
+    previous: "Zurück",
+    next: "Weiter",
+    page: "Seite"
   };
   const { groupId, inviteCode } = useParams();
   const [name, setName] = useState("");
@@ -124,13 +130,20 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
   const [copied, setCopied] = useState("");
   const [manualCopyUrl, setManualCopyUrl] = useState("");
   const [joinedGroupId, setJoinedGroupId] = useState("");
+  const [publicPage, setPublicPage] = useState(1);
   const group = groups.find((item) => item.id === groupId) ?? groups[0];
   const groupNames = useMemo(() => [...groups, ...publicGroups].map((item) => item.name.trim().toLowerCase()), [groups, publicGroups]);
   const publicGroupRows = useMemo(() => {
-    const ownPublicGroups = groups.filter((item) => !item.isPrivate).map((item) => ({ group: item, isMember: true }));
-    const publicRows = publicGroups.filter((item) => !groups.some((own) => own.id === item.id)).map((item) => ({ group: item, isMember: false }));
-    return [...ownPublicGroups, ...publicRows];
+    const myGroupIds = new Set(groups.map((item) => item.id));
+    return publicGroups.filter((item) => !myGroupIds.has(item.id));
   }, [groups, publicGroups]);
+  const publicPageSize = 10;
+  const publicPageCount = Math.max(1, Math.ceil(publicGroupRows.length / publicPageSize));
+  const visiblePublicGroups = publicGroupRows.slice((publicPage - 1) * publicPageSize, publicPage * publicPageSize);
+
+  useEffect(() => {
+    setPublicPage((current) => Math.min(current, publicPageCount));
+  }, [publicPageCount]);
 
   useEffect(() => {
     if (mode !== "invite" || !inviteCode || autoJoinedCode === inviteCode) return;
@@ -385,7 +398,6 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
         <GlassPanel className="group-list">
           {groups.length === 0 ? <p className="empty-state">{t.noGroups}</p> : groups.map((item) => (
             <Link to={`/groups/${item.id}`} key={item.id}>
-              <span className="round-icon"><UsersRound /></span>
               <strong>{item.name}<small>{t.active} · {item.memberCount} {t.members}</small></strong>
               <span>{t.best}<br /><b>{item.bestTimeSeconds ? formatDuration(item.bestTimeSeconds) : "–"}</b></span>
               <ChevronRight />
@@ -394,15 +406,19 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
         </GlassPanel>
         <h2>{t.publicGroups}</h2>
         <GlassPanel className="group-list">
-          {publicGroupRows.length === 0 ? <p className="empty-state">{t.noPublicGroups}</p> : publicGroupRows.map(({ group: item, isMember }) => (
+          {publicGroupRows.length === 0 ? <p className="empty-state">{t.noPublicGroups}</p> : visiblePublicGroups.map((item) => (
             <article className="public-group-row" key={item.id}>
-              <span className="round-icon"><UsersRound /></span>
               <strong>{item.name}<small>{item.memberCount} {t.members}</small></strong>
-              {isMember
-                ? <Button variant="secondary" disabled={busy} onClick={() => void leaveCurrentGroup(item.id)}>{t.leave}</Button>
-                : <Button variant="secondary" disabled={busy} onClick={() => void joinPublic(item.inviteCode)}>{t.joinCta}</Button>}
+              <Button variant="secondary" disabled={busy} onClick={() => void joinPublic(item.inviteCode)}>{t.joinCta}</Button>
             </article>
           ))}
+          {publicPageCount > 1 ? (
+            <nav className="group-pagination" aria-label={t.publicGroups}>
+              <button type="button" disabled={publicPage === 1} onClick={() => setPublicPage((page) => Math.max(1, page - 1))}>{t.previous}</button>
+              <span>{t.page} {publicPage} / {publicPageCount}</span>
+              <button type="button" disabled={publicPage === publicPageCount} onClick={() => setPublicPage((page) => Math.min(publicPageCount, page + 1))}>{t.next}</button>
+            </nav>
+          ) : null}
           {error ? <p className="form-error">{error}</p> : null}
           {success ? <p className="form-success">{success}</p> : null}
         </GlassPanel>

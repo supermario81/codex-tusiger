@@ -16,6 +16,10 @@ export function ProfilePage() {
     updated: "Avatar updated.",
     failed: "Avatar could not be updated.",
     visible: "Rookie · Publicly visible",
+    hidden: "Rookie · Private leaderboard only",
+    publicToggle: "Show in public leaderboard",
+    publicUpdated: "Leaderboard visibility updated.",
+    publicUpdateFailed: "Visibility could not be updated.",
     noTime: "No time yet",
     history: "Run history",
     empty: "No runs saved yet.",
@@ -28,6 +32,10 @@ export function ProfilePage() {
     updated: "Avatar aktualisiert.",
     failed: "Avatar konnte nicht aktualisiert werden.",
     visible: "Rookie · Öffentlich sichtbar",
+    hidden: "Rookie · Nur persönliche Rangliste",
+    publicToggle: "In öffentlicher Rangliste anzeigen",
+    publicUpdated: "Ranglisten-Sichtbarkeit aktualisiert.",
+    publicUpdateFailed: "Sichtbarkeit konnte nicht aktualisiert werden.",
     noTime: "Noch keine Zeit",
     history: "Lauf-History",
     empty: "Noch keine Läufe gespeichert.",
@@ -37,6 +45,8 @@ export function ProfilePage() {
   };
   const [avatarState, setAvatarState] = useState("");
   const [avatarError, setAvatarError] = useState("");
+  const [visibilityState, setVisibilityState] = useState("");
+  const [visibilityError, setVisibilityError] = useState("");
   if (!profile) {
     return <Navigate to="/login" replace />;
   }
@@ -51,11 +61,32 @@ export function ProfilePage() {
     setAvatarState(t.optimizing);
     try {
       const avatarUrl = await uploadAvatar(file);
-      await saveProfile({ nickname: currentProfile.nickname, avatarUrl, language });
+      await saveProfile({
+        nickname: currentProfile.nickname,
+        avatarUrl,
+        language,
+        showInPublicLeaderboard: currentProfile.showInPublicLeaderboard
+      });
       setAvatarState(t.updated);
     } catch (cause) {
       setAvatarError(cause instanceof Error ? cause.message : t.failed);
       setAvatarState("");
+    }
+  }
+
+  async function handlePublicVisibility(nextValue: boolean) {
+    setVisibilityError("");
+    setVisibilityState("");
+    try {
+      await saveProfile({
+        nickname: currentProfile.nickname,
+        avatarUrl: currentProfile.avatarUrl,
+        language,
+        showInPublicLeaderboard: nextValue
+      });
+      setVisibilityState(t.publicUpdated);
+    } catch (cause) {
+      setVisibilityError(cause instanceof Error ? cause.message : t.publicUpdateFailed);
     }
   }
 
@@ -70,10 +101,20 @@ export function ProfilePage() {
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatar} />
           </label>
           <h2>{currentProfile.nickname}</h2>
-          <p>{t.visible}</p>
+          <p>{currentProfile.showInPublicLeaderboard ? t.visible : t.hidden}</p>
+          <label className="toggle-line profile-toggle">
+            <span><strong>{t.publicToggle}</strong></span>
+            <input
+              type="checkbox"
+              checked={currentProfile.showInPublicLeaderboard}
+              onChange={(event) => void handlePublicVisibility(event.currentTarget.checked)}
+            />
+          </label>
           <span className="status-badge status-valid"><Trophy size={16} /> {best ? formatDuration(best.durationSeconds) : t.noTime}</span>
           {avatarState ? <small>{avatarState}</small> : null}
           {avatarError ? <p className="form-error">{avatarError}</p> : null}
+          {visibilityState ? <small>{visibilityState}</small> : null}
+          {visibilityError ? <p className="form-error">{visibilityError}</p> : null}
         </GlassPanel>
         <GlassPanel className="run-history-list">
           <h2>{t.history}</h2>

@@ -3,9 +3,10 @@ create extension if not exists "pgcrypto";
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade unique not null,
-  nickname text not null check (char_length(nickname) between 3 and 20),
+  nickname text not null check (char_length(nickname) between 3 and 30),
   avatar_url text,
   language text not null default 'de' check (language in ('de', 'en')),
+  show_in_public_leaderboard boolean not null default true,
   role text not null default 'user' check (role in ('user', 'admin')),
   deleted_at timestamptz,
   created_at timestamptz not null default now(),
@@ -167,7 +168,9 @@ select
   r.validation_score
 from public.runs r
 join public.profiles p on p.user_id = r.user_id
-where r.status = 'valid' and p.deleted_at is null;
+where r.status = 'valid'
+  and p.deleted_at is null
+  and p.show_in_public_leaderboard = true;
 
 create or replace view public.group_summaries
 with (security_invoker = true) as

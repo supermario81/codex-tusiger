@@ -133,6 +133,7 @@ supabase/migrations/0003_tusiger_1150_steps_avatar_limit.sql
 supabase/migrations/0004_multilingual_content.sql
 supabase/migrations/0005_group_rpc.sql
 supabase/migrations/0006_fix_group_invites_rls.sql
+supabase/migrations/0007_public_leaderboard_visibility.sql
 ```
 
 Die Migrationen erstellen:
