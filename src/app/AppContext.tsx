@@ -314,9 +314,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveProfile = useCallback(async (input: { nickname: string; avatarUrl: string; language: "de" | "en" }) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    const nickname = input.nickname.trim();
+    const { data: duplicateProfiles, error: duplicateError } = await supabase
+      .from("profiles")
+      .select("id,user_id")
+      .ilike("nickname", nickname)
+      .is("deleted_at", null)
+      .neq("user_id", user.id)
+      .limit(1);
+    if (duplicateError) throw duplicateError;
+    if (duplicateProfiles?.length) {
+      throw new Error(input.language === "en" ? "This nickname is already taken." : "Dieser Nickname ist bereits vergeben.");
+    }
     const { error } = await supabase.from("profiles").upsert({
       user_id: user.id,
-      nickname: input.nickname,
+      nickname,
       avatar_url: input.avatarUrl,
       language: input.language,
       role: profile?.role ?? "user",
@@ -374,6 +386,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const currentUser = user;
     const currentSupabase = supabase;
 
+    const existingGroupNames = [...groups, ...publicGroups].map((item) => item.name.trim().toLowerCase());
+    if (existingGroupNames.includes(groupInput.name.trim().toLowerCase())) {
+      throw new Error("Dieser Gruppenname ist bereits vergeben.");
+    }
+
     async function createDirect(rpcError?: unknown) {
       const id = crypto.randomUUID();
       const inviteCode = generateInviteCode();
@@ -415,7 +432,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGroups((current) => [group, ...current.filter((item) => item.id !== group.id)]);
     setPublicGroups((current) => current.filter((item) => item.id !== group.id));
     return group;
-  }, [trackEvent, user]);
+  }, [groups, publicGroups, trackEvent, user]);
 
   const joinGroup = useCallback(async (inviteCode: string) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");

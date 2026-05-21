@@ -1,5 +1,7 @@
 import type { PublicRun } from "../types";
 
+const pendingInviteKey = "tusiger.pendingInviteCode";
+
 export function filterLeaderboardByTab(runs: PublicRun[], tab: "Heute" | "Woche" | "Monat" | "Gesamt", now = new Date()): PublicRun[] {
   return runs.filter((run) => {
     const date = new Date(run.date);
@@ -10,10 +12,41 @@ export function filterLeaderboardByTab(runs: PublicRun[], tab: "Heute" | "Woche"
   });
 }
 
+function inviteCandidate(value: string): string {
+  let candidate = value.trim();
+  try {
+    candidate = decodeURIComponent(candidate);
+  } catch {
+    // Keep the original string if a pasted URL contains malformed escapes.
+  }
+  const joinMatch = candidate.match(/(?:^|[#/])join\/([^/?#&]+)/i);
+  if (joinMatch?.[1]) return joinMatch[1];
+  return candidate;
+}
+
 export function normalizeInviteCode(value: string): string {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return inviteCandidate(value).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 export function createInviteUrl(origin: string, path: string, inviteCode: string): string {
   return `${origin}${path}#/join/${normalizeInviteCode(inviteCode)}`;
+}
+
+export function savePendingInviteCode(value: string): string {
+  const code = normalizeInviteCode(value);
+  if (code && typeof localStorage !== "undefined") {
+    localStorage.setItem(pendingInviteKey, code);
+  }
+  return code;
+}
+
+export function readPendingInviteCode(): string {
+  if (typeof localStorage === "undefined") return "";
+  return normalizeInviteCode(localStorage.getItem(pendingInviteKey) ?? "");
+}
+
+export function clearPendingInviteCode() {
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(pendingInviteKey);
+  }
 }

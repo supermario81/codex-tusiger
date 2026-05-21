@@ -14,6 +14,7 @@ import { PreRunPage } from "../features/run/PreRunPage";
 import { ResultPage } from "../features/run/ResultPage";
 import { RunPage } from "../features/run/RunPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
+import { readPendingInviteCode, savePendingInviteCode } from "../lib/community/community";
 import { useApp } from "./AppContext";
 
 function Gate({ children }: { children: React.ReactNode }) {
@@ -28,12 +29,22 @@ function Gate({ children }: { children: React.ReactNode }) {
     return <LoginPage />;
   }
 
+  if (location.pathname.startsWith("/join/")) {
+    savePendingInviteCode(location.pathname);
+  }
+
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   if (!profile) {
     return <Navigate to="/setup-profile" replace state={{ from: location.pathname }} />;
+  }
+
+  const pendingInviteCode = readPendingInviteCode();
+  const pendingInvitePath = pendingInviteCode ? "/join/" + pendingInviteCode : "";
+  if (pendingInvitePath && location.pathname !== pendingInvitePath) {
+    return <Navigate to={pendingInvitePath} replace />;
   }
 
   return children;
@@ -44,6 +55,8 @@ function PublicStart() {
   if (!ready) return <div className="boot-screen">Tusiger wird geladen...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile) return <Navigate to="/setup-profile" replace />;
+  const pendingInviteCode = readPendingInviteCode();
+  if (pendingInviteCode) return <Navigate to={"/join/" + pendingInviteCode} replace />;
   return <HomePage />;
 }
 

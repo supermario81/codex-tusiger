@@ -1055,3 +1055,48 @@ form { display: grid; gap: 16px; }
   .leaderboard-list svg { display: none; }
   .zone-card, .donate-card { grid-template-columns: 1fr; }
 }
+.install-hint > div {
+  display: grid;
+  gap: 6px;
+}
+.install-hint small {
+  color: rgba(52,78,65,.72);
+  font-size: .78rem;
+  line-height: 1.25;
+}
+.install-hint .install-action {
+  width: fit-content;
+  height: auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--leaf);
+  color: white;
+  font-weight: 800;
+}
+.form-success {
+  color: var(--forest);
+  font-weight: 800;
+}
+.ranger-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.ranger-card img {
+  width: 100%;
+  border-radius: 18px;
+  object-fit: cover;
+  box-shadow: 0 16px 40px rgba(52,78,65,.18);
+}
+.ranger-card p {
+  margin: 0;
+  font-size: .9rem;
+  color: rgba(52,78,65,.82);
+}
+.ranger-card a {
+  text-decoration: none;
+}
+.qr-card small {
+  display: none;
+}

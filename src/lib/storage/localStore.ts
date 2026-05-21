@@ -34,26 +34,6 @@ export const localStore = {
   readActiveRun: () => readJson<RunRecord | null>(keys.activeRun, null),
   writeActiveRun: (run: RunRecord) => writeJson(keys.activeRun, run),
   clearActiveRun: () => localStorage.removeItem(keys.activeRun),
-  readGroups: () =>
-    readJson<Group[]>(keys.groups, [
-      {
-        id: "gipfelstuermer",
-        name: "Gipfelstürmer",
-        description: "Die schnelle Tusiger-Crew.",
-        inviteCode: "GIPFEL",
-        isPrivate: false,
-        memberCount: 24,
-        bestTimeSeconds: 768
-      },
-      {
-        id: "waldlaeufer",
-        name: "Waldläufer",
-        description: "Ruhig, stark, gemeinsam.",
-        inviteCode: "WALD",
-        isPrivate: false,
-        memberCount: 18,
-        bestTimeSeconds: 937
-      }
-    ]),
+  readGroups: () => readJson<Group[]>(keys.groups, []),
   writeGroups: (groups: Group[]) => writeJson(keys.groups, groups)
 };

@@ -20,7 +20,7 @@ export const defaultChallengeConfig: ChallengeConfig = {
   minDurationSeconds: 240,
   maxDurationSeconds: 7200,
   publishNeedsReview: false,
-  donationUrl: "https://example.org/spenden",
+  donationUrl: "",
   active: true
 };
 

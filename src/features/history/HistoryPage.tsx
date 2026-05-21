@@ -1,4 +1,4 @@
-import { ExternalLink, Heart, Mountain, UsersRound } from "lucide-react";
+import { ExternalLink, Heart, Mountain, Newspaper, UsersRound } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
@@ -6,30 +6,38 @@ import { GlassPanel } from "../../components/ui/Card";
 import { historyFallback } from "../../data/challenge";
 import { useApp } from "../../app/AppContext";
 
+const twintQrPayload = "02:c5dfc37fcf134ad28b36005377d01f7e#1ab4b010c0e4a69e123ca110cad2a863b3a07420#";
+const articleUrl = "https://lenzburger-nachrichten.ch/zofingen/detail/die-born-ranger-unterhalten-seit-39-jahren-hoerbis-vermaechtnis";
+
 export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) {
   const donationRef = useRef<HTMLDivElement>(null);
   const { config, history, language, trackEvent } = useApp();
+  const baseUrl = import.meta.env.BASE_URL;
+  const qrImageUrl = `${baseUrl}images/twint-1000er-staegli.jpg`;
+  const donationHref = config.donationUrl && !config.donationUrl.includes("example.org") ? config.donationUrl : qrImageUrl;
   const t = language === "en" ? {
     eyebrow: "1000er-Stägli",
     title: "Since 1904 above the A1 at Born",
     intro: "The story of the sky stairs: today 1150 steps, maintained by volunteers.",
     visual: "More than steps. An attitude.",
+    rangerCaption: "The volunteer Born Rangers with (from left): Rolf Wullschleger, Hans Schürch, Kurt Hilfiker, Andy Flükiger, Bruno Muntwyler and Guido Vonäsch. Image: zvg",
+    article: "Read article",
     donateTitle: "Support maintenance",
     maintenance: "Regular maintenance of the 1000er-Stägli is carried out by a volunteer working group: paths, barbecue areas, firewood, cleaning, material, transport, tools and many hours of physical work.",
     note: "The donation goes directly to the responsible volunteer working group / Born Rangers Team. Tusiger only provides the pointer.",
-    file: "Image file: public/images/twint-1000er-staegli.jpg",
-    qr: "TWINT QR from the official flyer",
+    qr: "Official TWINT QR. If the button opens the image, open TWINT and scan the QR code.",
     cta: "Support via TWINT"
   } : {
     eyebrow: "1000er-Stägli",
     title: "Seit 1904 am Born oberhalb der A1",
     intro: "Die Geschichte der Himmelstreppe: heute 1150 Stufen, getragen vom Unterhalt durch Freiwillige.",
     visual: "Mehr als Schritte. Eine Haltung.",
+    rangerCaption: "Die freiwilligen «Born-Ranger» mit (von links): Rolf Wullschleger, Hans Schürch, Kurt Hilfiker, Andy Flükiger, Bruno Muntwyler und Guido Vonäsch. Bild: zvg",
+    article: "Artikel lesen",
     donateTitle: "Unterstütze den Unterhalt",
     maintenance: "Der regelmässige Unterhalt des 1000er-Stäglis wird durch eine freiwillige Arbeitsgruppe geleistet: Wege, Grillstellen, Feuerholz, Reinigung, Material, Transport, Werkzeuge und viele Stunden körperliche Arbeit.",
     note: "Die Spende geht direkt an die zuständige freiwillige Arbeitsgruppe / Born Rangers Team. Tusiger stellt nur den Hinweis bereit.",
-    file: "Bilddatei: public/images/twint-1000er-staegli.jpg",
-    qr: "TWINT QR vom offiziellen Flyer",
+    qr: "Offizieller TWINT QR. Falls der Button das Bild öffnet: TWINT öffnen und den QR-Code scannen.",
     cta: "Jetzt per TWINT unterstützen"
   };
   const localizedHistory = (history.length > 0 ? history : historyFallback).filter((item) => !item.language || item.language === language);
@@ -41,6 +49,11 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
     }
     void trackEvent(focusDonate ? "donation_clicked" : "history_viewed");
   }, [focusDonate, trackEvent]);
+
+  function handleDonateClick() {
+    navigator.clipboard?.writeText(twintQrPayload).catch(() => undefined);
+    void trackEvent("donation_clicked", { target: donationHref });
+  }
 
   return (
     <PageShell>
@@ -62,6 +75,13 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
           <strong>{t.visual}</strong>
           <Heart />
         </GlassPanel>
+        <GlassPanel className="ranger-card">
+          <img src={`${baseUrl}images/born-tusiger-rangers.webp`} alt="Born Rangers beim Unterhalt des 1000er-Stäglis" draggable={false} />
+          <p>{t.rangerCaption}</p>
+          <a href={articleUrl} target="_blank" rel="noreferrer">
+            <Button variant="secondary" icon={<Newspaper />}>{t.article}</Button>
+          </a>
+        </GlassPanel>
         <GlassPanel className="donate-card" ref={donationRef}>
           <span className="round-icon"><Heart /></span>
           <div>
@@ -71,16 +91,16 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
           </div>
           <div className="qr-card">
             <img
-              src={`${import.meta.env.BASE_URL}images/twint-1000er-staegli.jpg`}
+              src={qrImageUrl}
               alt="TWINT QR 1000er-Stägli"
+              draggable={false}
               onError={(event) => {
                 event.currentTarget.hidden = true;
               }}
             />
-            <small>{t.file}</small>
             <span>{t.qr}</span>
           </div>
-          <a href={config.donationUrl || `${import.meta.env.BASE_URL}images/twint-1000er-staegli.jpg`} target="_blank" rel="noreferrer">
+          <a href={donationHref} target="_blank" rel="noreferrer" onClick={handleDonateClick}>
             <Button icon={<ExternalLink />}>{t.cta}</Button>
           </a>
         </GlassPanel>

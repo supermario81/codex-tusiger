@@ -4,6 +4,11 @@ import { useApp } from "../../app/AppContext";
 
 const seenKey = "tusiger.installHintDismissed";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 function isStandalone() {
   return window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
@@ -11,20 +16,33 @@ function isStandalone() {
 export function InstallHint() {
   const { language } = useApp();
   const [visible, setVisible] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const copy = language === "en"
     ? {
       title: "Install app",
-      body: "In Safari: open Share and choose “Add to Home Screen”.",
+      body: "Add Tusiger to your home screen for the best PWA experience.",
+      action: "Install",
+      safari: "In Safari: open Share and choose “Add to Home Screen”.",
       close: "Close hint"
     }
     : {
       title: "App installieren",
-      body: "In Safari: Teilen öffnen und „Zum Home-Bildschirm“ wählen.",
+      body: "Füge Tusiger zum Home-Bildschirm hinzu, damit die PWA wie eine App startet.",
+      action: "Installieren",
+      safari: "In Safari: Teilen öffnen und „Zum Home-Bildschirm“ wählen.",
       close: "Hinweis schliessen"
     };
 
   useEffect(() => {
     setVisible(!isStandalone() && localStorage.getItem(seenKey) !== "true");
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      setVisible(true);
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
   }, []);
 
   if (!visible) return null;
@@ -34,10 +52,28 @@ export function InstallHint() {
     setVisible(false);
   }
 
+  async function install() {
+    if (!installPrompt) {
+      setShowHelp(true);
+      return;
+    }
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === "accepted") {
+      dismiss();
+    } else {
+      setShowHelp(true);
+    }
+  }
+
   return (
     <div className="install-hint">
       <span><Download /></span>
-      <p><strong>{copy.title}</strong> {copy.body}</p>
+      <div>
+        <p><strong>{copy.title}</strong> {copy.body}</p>
+        {showHelp || !installPrompt ? <small>{copy.safari}</small> : null}
+        <button className="install-action" type="button" onClick={() => void install()}>{copy.action}</button>
+      </div>
       <button type="button" onClick={dismiss} aria-label={copy.close}><X /></button>
     </div>
   );

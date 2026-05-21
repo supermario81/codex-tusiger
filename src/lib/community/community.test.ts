@@ -14,6 +14,7 @@ describe("community helpers", () => {
 
   it("normalizes invite codes", () => {
     expect(normalizeInviteCode(" ab-12 ")).toBe("AB12");
+    expect(normalizeInviteCode("https://supermario81.github.io/codex-tusiger/#/join/TUSAB12CD")).toBe("TUSAB12CD");
   });
 
   it("creates hash invite URLs for GitHub Pages", () => {
