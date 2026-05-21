@@ -9,6 +9,12 @@ import { Input } from "../../components/ui/Input";
 import { formatDuration } from "../../lib/geo/geo";
 import { createInviteUrl, normalizeInviteCode } from "../../lib/community/community";
 
+function errorText(cause: unknown, fallback: string) {
+  if (cause instanceof Error && cause.message) return cause.message;
+  if (cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string") return cause.message;
+  return fallback;
+}
+
 export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invite" }) {
   const { config, createGroup, groups, joinGroup, language, leaveGroup, publicGroups } = useApp();
   const navigate = useNavigate();
@@ -92,7 +98,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     setAutoJoinedCode(inviteCode);
     joinGroup(normalizeInviteCode(inviteCode))
       .then((next) => setInvite(next.inviteCode))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : t.joinError));
+      .catch((cause) => setError(errorText(cause, t.joinError)));
   }, [autoJoinedCode, inviteCode, joinGroup, mode, t.joinError]);
 
   async function submitGroup(event: FormEvent) {
@@ -105,7 +111,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
       const next = await createGroup({ name: name.trim(), description: "", isPrivate });
       setInvite(next.inviteCode);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t.createdError);
+      setError(errorText(cause, t.createdError));
     }
   }
 
@@ -116,7 +122,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
       const next = await joinGroup(normalizeInviteCode(invite || inviteCode || ""));
       setInvite(next.inviteCode);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t.joinError);
+      setError(errorText(cause, t.joinError));
     }
   }
 
@@ -125,7 +131,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
     try {
       await joinGroup(normalizeInviteCode(inviteCodeToJoin));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t.joinError);
+      setError(errorText(cause, t.joinError));
     }
   }
 
@@ -135,7 +141,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
       await leaveGroup(id);
       navigate("/groups");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Gruppe konnte nicht verlassen werden.");
+      setError(errorText(cause, language === "en" ? "Could not leave group." : "Gruppe konnte nicht verlassen werden."));
     }
   }
 

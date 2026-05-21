@@ -64,6 +64,15 @@ function cleanEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function generateInviteCode() {
+  const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+  return `TUS${randomPart}`;
+}
+
+function withRpcFallbackMessage(action: string, rpcError: unknown, fallbackError: unknown) {
+  return new Error(`${action}: ${errorMessage(fallbackError)} RPC: ${errorMessage(rpcError)}. Bitte Supabase-Migration 0005_group_rpc.sql ausführen, falls geschlossene Invite-Links nicht funktionieren.`);
+}
+
 function avatarStoragePath(publicUrl: string) {
   const marker = "/storage/v1/object/public/avatars/";
   const index = publicUrl.indexOf(marker);
@@ -362,26 +371,81 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const createGroup = useCallback(async (groupInput: Pick<Group, "name" | "description" | "isPrivate">) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    const { data, error } = await supabase.rpc("create_tusiger_group", {
-      p_name: groupInput.name,
+    const currentUser = user;
+    const currentSupabase = supabase;
+
+    async function createDirect(rpcError?: unknown) {
+      const id = crypto.randomUUID();
+      const inviteCode = generateInviteCode();
+      const row = {
+        id,
+        owner_user_id: currentUser.id,
+        name: groupInput.name.trim(),
+        description: groupInput.description?.trim() ?? "",
+        invite_code: inviteCode,
+        is_private: groupInput.isPrivate
+      };
+      const { error: groupError } = await currentSupabase.from("groups").insert(row);
+      if (groupError) {
+        if (rpcError) throw withRpcFallbackMessage("Gruppe konnte nicht erstellt werden", rpcError, groupError);
+        throw groupError;
+      }
+      const { error: memberError } = await currentSupabase.from("group_members").insert({ group_id: id, user_id: currentUser.id, role: "owner" });
+      if (memberError) {
+        await currentSupabase.from("groups").delete().eq("id", id);
+        if (rpcError) throw withRpcFallbackMessage("Gruppenmitgliedschaft konnte nicht erstellt werden", rpcError, memberError);
+        throw memberError;
+      }
+      return fromGroupRow({ ...row, member_count: 1, best_time_seconds: null }, "owner");
+    }
+
+    let group: Group;
+    const rpcResult = await currentSupabase.rpc("create_tusiger_group", {
+      p_name: groupInput.name.trim(),
       p_is_private: groupInput.isPrivate
     }).single();
-    if (error) throw error;
+
+    if (rpcResult.error) {
+      group = await createDirect(rpcResult.error);
+    } else {
+      group = fromGroupRow(rpcResult.data as Record<string, unknown>, "owner");
+    }
+
     await trackEvent("group_created");
-    const group = fromGroupRow(data as Record<string, unknown>, "owner");
-    setGroups((current) => [group, ...current]);
+    setGroups((current) => [group, ...current.filter((item) => item.id !== group.id)]);
     setPublicGroups((current) => current.filter((item) => item.id !== group.id));
     return group;
   }, [trackEvent, user]);
 
   const joinGroup = useCallback(async (inviteCode: string) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    const { data: group, error } = await supabase.rpc("join_tusiger_group", {
-      p_invite_code: inviteCode.toUpperCase()
+    const normalizedInviteCode = inviteCode.toUpperCase();
+    const rpcResult = await supabase.rpc("join_tusiger_group", {
+      p_invite_code: normalizedInviteCode
     }).single();
-    if (error) throw error;
-    await trackEvent("group_joined", { inviteCode });
-    const next = fromGroupRow(group as Record<string, unknown>, "member");
+
+    let next: Group;
+    if (rpcResult.error) {
+      const { data: groupRow, error: groupError } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("invite_code", normalizedInviteCode)
+        .maybeSingle();
+      if (groupError || !groupRow) {
+        throw withRpcFallbackMessage("Gruppe konnte per Invite-Code nicht gefunden werden", rpcResult.error, groupError ?? new Error("Invite-Code nicht lesbar"));
+      }
+      const { error: joinError } = await supabase.from("group_members").upsert({
+        group_id: String(groupRow.id),
+        user_id: user.id,
+        role: "member"
+      }, { onConflict: "group_id,user_id" });
+      if (joinError) throw withRpcFallbackMessage("Gruppe konnte nicht beigetreten werden", rpcResult.error, joinError);
+      next = fromGroupRow({ ...groupRow, member_count: Number(groupRow.member_count ?? 0) + 1 }, "member");
+    } else {
+      next = fromGroupRow(rpcResult.data as Record<string, unknown>, "member");
+    }
+
+    await trackEvent("group_joined", { inviteCode: normalizedInviteCode });
     setGroups((current) => [next, ...current.filter((item) => item.id !== next.id)]);
     setPublicGroups((current) => current.filter((item) => item.id !== next.id));
     return next;
