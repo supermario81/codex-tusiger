@@ -1,4 +1,4 @@
-import { BarChart3, Check, Trophy } from "lucide-react";
+import { BarChart3, Check, Home, Trophy, XCircle } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
@@ -7,7 +7,7 @@ import { ValidationBadge } from "../../components/ui/StatusBadge";
 import { localStore } from "../../lib/storage/localStore";
 import { formatDuration } from "../../lib/geo/geo";
 import { useApp } from "../../app/AppContext";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 function playFanfare() {
   const audioFile = `${import.meta.env.BASE_URL}audio/victory.mp3`;
@@ -44,14 +44,59 @@ function playFanfare() {
   });
 }
 
+function playFailSound() {
+  const audioFile = `${import.meta.env.BASE_URL}audio/fail.mp3`;
+  const audio = new Audio(audioFile);
+  audio.volume = 0.45;
+  void audio.play().catch(() => {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    const notes = [
+      { freq: 392, start: 0, dur: 0.18 },
+      { freq: 329.63, start: 0.2, dur: 0.18 },
+      { freq: 261.63, start: 0.42, dur: 0.36 }
+    ];
+
+    notes.forEach(({ freq, start, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(0.18, now + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + dur + 0.04);
+    });
+  });
+}
+
 export function FinishPage() {
   const { config } = useApp();
   const runId = localStorage.getItem("tusiger.lastRunId");
   const run = localStore.readRuns().find((item) => item.id === runId);
+  const isSuccessful = Boolean(run && run.status === "valid" && run.estimatedSteps >= config.totalSteps);
+  const playedRunId = useRef<string | null>(null);
 
   useEffect(() => {
-    playFanfare();
-  }, []);
+    if (!run) {
+      return;
+    }
+    if (playedRunId.current === run.id) {
+      return;
+    }
+    playedRunId.current = run.id;
+    if (isSuccessful) {
+      playFanfare();
+    } else {
+      playFailSound();
+    }
+  }, [isSuccessful, run]);
 
   if (!run) {
     return <Navigate to="/" replace />;
@@ -60,19 +105,32 @@ export function FinishPage() {
   return (
     <PageShell nav={false}>
       <section className="finish-page">
-        <div className="confetti" aria-hidden />
+        {isSuccessful ? <div className="confetti" aria-hidden /> : null}
         <GlassPanel className="finish-card">
-          <span className="success-medal"><Check /></span>
-          <h1>DU HAST ES GESCHAFFT!</h1>
-          <p>Du hast alle {config.totalSteps} Stufen gemeistert.</p>
+          <span className={`success-medal ${isSuccessful ? "" : "fail"}`}>
+            {isSuccessful ? <Check /> : <XCircle />}
+          </span>
+          <h1>{isSuccessful ? "DU HAST ES GESCHAFFT!" : "SORRY, DIESER LAUF IST UNGÜLTIG."}</h1>
+          <p>
+            {isSuccessful
+              ? `Du hast alle ${config.totalSteps} Stufen gemeistert.`
+              : `Dieser Lauf wurde nicht gültig abgeschlossen. Erfasste Stufen: ${run.estimatedSteps} / ${config.totalSteps}.`}
+          </p>
           <small>Deine Zeit</small>
           <strong>{formatDuration(run.durationSeconds)}</strong>
           <ValidationBadge status={run.status} />
-          <div className="personal-best">
-            <Trophy /> <span>Persönliche Bestzeit</span><b>{formatDuration(run.durationSeconds)}</b>
-          </div>
+          {isSuccessful ? (
+            <div className="personal-best">
+              <Trophy /> <span>Persönliche Bestzeit</span><b>{formatDuration(run.durationSeconds)}</b>
+            </div>
+          ) : (
+            <div className="personal-best muted-result">
+              <XCircle /> <span>Nicht gewertet</span><b>{run.estimatedSteps} / {config.totalSteps}</b>
+            </div>
+          )}
         </GlassPanel>
         <Link to={`/result/${run.id}`}><Button icon={<BarChart3 />}>Ergebnis ansehen</Button></Link>
+        <Link to="/"><Button variant="secondary" icon={<Home />}>Zur Startseite</Button></Link>
         <Link className="action-row" to="/leaderboard">Rangliste</Link>
       </section>
     </PageShell>

@@ -10,7 +10,7 @@ import { estimateStepsFromPosition, formatDuration, formatPace } from "../../lib
 import { localStore } from "../../lib/storage/localStore";
 import type { RunPoint, RunRecord } from "../../lib/types";
 import { validateRun } from "../../lib/validation/validateRun";
-import { createSyntheticRunPoints, positionToRunPoint } from "./runUtils";
+import { positionToRunPoint } from "./runUtils";
 
 export function RunPage() {
   const { config, profile, saveRun, userId } = useApp();
@@ -52,6 +52,8 @@ export function RunPage() {
   }, []);
 
   useEffect(() => {
+    const reliablePoint = points.filter((point) => point.accuracyM <= config.gpsAccuracyReviewMaxM).at(-1) ?? null;
+    const activeEstimatedSteps = estimateStepsFromPosition(reliablePoint, config);
     const active: RunRecord = {
       id: "active-run",
       userId,
@@ -69,17 +71,18 @@ export function RunPage() {
       gpsAccuracyAvgM: null,
       gpsAccuracyMinM: null,
       gpsAccuracyMaxM: null,
-      estimatedSteps: estimateStepsFromPosition(points.at(-1) ?? null, config),
-      pacePer100StepsSeconds: elapsed / 10,
+      estimatedSteps: activeEstimatedSteps,
+      pacePer100StepsSeconds: activeEstimatedSteps > 0 ? elapsed / (activeEstimatedSteps / 100) : null,
       points
     };
     localStore.writeActiveRun(active);
   }, [config, elapsed, points, startedAt, userId]);
 
-  const steps = Math.max(
-    estimateStepsFromPosition(points.at(-1) ?? null, config),
-    Math.min(config.totalSteps, Math.round((elapsed / 4140) * config.totalSteps))
-  );
+  const latestPoint = points.at(-1) ?? null;
+  const latestReliablePoint = points.filter((point) => point.accuracyM <= config.gpsAccuracyReviewMaxM).at(-1) ?? null;
+  const gpsOk = Boolean(latestPoint && latestPoint.accuracyM <= config.gpsAccuracyReviewMaxM);
+  const steps = estimateStepsFromPosition(latestReliablePoint, config);
+  const pacePer100 = steps > 0 ? elapsed / (steps / 100) : null;
   const coach = motivationMessages.find((item) => steps >= item.minSteps && steps < item.maxSteps)?.message ?? "Du hast es gleich geschafft.";
   const altitudeGain = points.length > 1 && points[0].altitudeM && points.at(-1)?.altitudeM
     ? Math.round((points.at(-1)?.altitudeM ?? 0) - (points[0].altitudeM ?? 0))
@@ -91,7 +94,7 @@ export function RunPage() {
 
   async function finishRun() {
     const finishedAt = new Date(new Date(startedAt).getTime() + elapsed * 1000).toISOString();
-    const sourcePoints = points.length >= 8 ? points : createSyntheticRunPoints(elapsed);
+    const sourcePoints = points;
     const validation = validateRun({ startedAt, endedAt: finishedAt }, sourcePoints, config);
     const forceReview = localStorage.getItem("tusiger.forceReview") === "true";
     const run: RunRecord = {
@@ -147,14 +150,14 @@ export function RunPage() {
         <h1>TUSIGER</h1>
         <p>Aktiver Lauf</p>
         <div className="run-dashboard">
-          <header><span className="live-dot" /> GPS OK <span>+{altitudeGain} m</span></header>
+          <header><span className={`live-dot ${gpsOk ? "" : "warn"}`} /> {gpsOk ? "GPS OK" : "GPS ungenau"} <span>+{altitudeGain} m</span></header>
           <strong className="big-timer">{formatDuration(elapsed)}</strong>
           <small>Zeit</small>
           <b>{steps} / {config.totalSteps}</b>
           <span>Stufen</span>
           <ProgressBar value={steps} max={config.totalSteps} />
           <div className="run-metrics">
-            <span><Timer /> Pace / 100<br /><strong>{formatPace(elapsed / 10)}</strong></span>
+            <span><Timer /> Pace / 100<br /><strong>{formatPace(pacePer100)}</strong></span>
             <span>GPS Punkte<br /><strong>{points.length}</strong></span>
             <span>Höhenmeter<br /><strong>{altitudeGain}</strong></span>
           </div>

@@ -35,6 +35,12 @@ describe("validateRun", () => {
     expect(runFor(createSyntheticRunPoints(), 90).status).toBe("invalid");
   });
 
+  it("does not award full stair progress when GPS points are missing", () => {
+    const result = runFor([], 90);
+    expect(result.status).toBe("invalid");
+    expect(result.metrics.estimatedSteps).toBe(0);
+  });
+
   it("sends poor GPS accuracy to review or invalid", () => {
     const points = createSyntheticRunPoints().map((point) => ({ ...point, accuracyM: 48 }));
     expect(runFor(points).status).toBe("invalid");

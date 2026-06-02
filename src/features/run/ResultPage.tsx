@@ -12,6 +12,8 @@ export function ResultPage() {
   const { runId } = useParams();
   const { runs } = useApp();
   const run = runs.find((item) => item.id === runId) ?? runs[0];
+  const validationLabel =
+    run?.status === "valid" ? "Validiert" : run?.status === "invalid" ? "Ungültig" : "Prüfung";
 
   if (!run) {
     return (
@@ -40,7 +42,7 @@ export function ResultPage() {
           <MetricCard icon={<Timer />} label="Gesamtzeit" value={formatDuration(run.durationSeconds)} meta="hh:mm:ss" />
           <MetricCard icon={<Flag />} label="Stufen" value={String(run.estimatedSteps)} meta="Schritte" />
           <MetricCard icon={<Mountain />} label="Höhenmeter" value={`${Math.round(run.elevationGainM ?? 0)} m`} meta="Anstieg" />
-          <MetricCard icon={<ShieldCheck />} label="Validierung" value={run.status === "valid" ? "Validiert" : "Prüfung"} meta="GPS & Regeln" />
+          <MetricCard icon={<ShieldCheck />} label="Validierung" value={validationLabel} meta="GPS & Regeln" />
         </GlassPanel>
         <GlassPanel className="route-card">
           <h2>Route <span><Map size={18} /> Karte</span></h2>

@@ -1,4 +1,4 @@
-import { calculateRouteDistance, haversineDistanceMeters, stableEdgePoint } from "../geo/geo";
+import { calculateRouteDistance, estimateStepsFromPosition, haversineDistanceMeters, stableEdgePoint } from "../geo/geo";
 import type { ChallengeConfig, RunPoint, ValidationResult } from "../types";
 
 function average(values: number[]): number | null {
@@ -128,9 +128,9 @@ export function validateRun(
     reasons.push("Route plausibel.");
   }
 
-  const estimatedSteps = config.totalSteps;
+  const estimatedSteps = estimateStepsFromPosition(endPoint, config);
   const pacePer100Steps =
-    durationSeconds > 0 ? durationSeconds / (config.totalSteps / 100) : null;
+    durationSeconds > 0 && estimatedSteps > 0 ? durationSeconds / (estimatedSteps / 100) : null;
   const status =
     invalidReasons.length > 0 ? "invalid" : reviewReasons.length > 0 ? "needs_review" : "valid";
   const score = Math.max(0, 100 - invalidReasons.length * 35 - reviewReasons.length * 12);

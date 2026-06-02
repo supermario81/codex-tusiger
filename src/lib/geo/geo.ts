@@ -72,6 +72,10 @@ export function estimateStepsFromPosition(point: RunPoint | null, config: Challe
     return 0;
   }
 
+  if (point.accuracyM > config.gpsAccuracyReviewMaxM) {
+    return 0;
+  }
+
   let nearestIndex = 0;
   let nearestDist = Infinity;
   for (let i = 0; i < routeWaypoints.length; i += 1) {

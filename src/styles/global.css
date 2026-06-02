@@ -591,17 +591,24 @@ form { display: grid; gap: 16px; }
   font-style: normal;
 }
 
-.back-button {
+.shell-actions {
   position: absolute;
   top: 54px;
   left: 20px;
+  z-index: 7;
+  display: flex;
+  gap: 8px;
+}
+.shell-action-button {
   width: 50px;
   height: 50px;
   border: 1px solid rgba(255,255,255,.6);
   border-radius: 50%;
   background: var(--paper);
   color: var(--deep);
-  z-index: 2;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 26px rgba(52,78,65,.12);
 }
 .pre-run { padding-top: 64px; text-align: center; }
 .pre-run > p { font-size: 1.35rem; color: var(--forest); }
@@ -699,6 +706,10 @@ form { display: grid; gap: 16px; }
   margin-right: 8px;
   border-radius: 50%;
   background: #cce89b;
+}
+.live-dot.warn {
+  background: #c0a24c;
+  box-shadow: 0 0 18px rgba(192,162,76,.55);
 }
 .big-timer {
   display: block;
@@ -806,6 +817,9 @@ form { display: grid; gap: 16px; }
   background: var(--deep);
   color: white;
 }
+.success-medal.fail {
+  background: #9d3f34;
+}
 .personal-best {
   width: 100%;
   display: grid;
@@ -815,6 +829,10 @@ form { display: grid; gap: 16px; }
   padding: 14px;
   border: 1px solid rgba(52,78,65,.16);
   border-radius: 18px;
+}
+.muted-result {
+  color: rgba(52,78,65,.82);
+  background: rgba(255,255,255,.34);
 }
 .finish-page {
   position: relative;

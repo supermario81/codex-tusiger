@@ -42,4 +42,9 @@ describe("estimateStepsFromPosition", () => {
       expect(Math.abs(estimatedSteps - waypoint.steps)).toBeLessThanOrEqual(35);
     });
   });
+
+  it("does not estimate stair progress from unreliable GPS points", () => {
+    const point = { ...pointFromWaypoint(12, true), accuracyM: 90 };
+    expect(estimateStepsFromPosition(point, defaultChallengeConfig)).toBe(0);
+  });
 });
