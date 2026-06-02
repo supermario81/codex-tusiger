@@ -1,12 +1,13 @@
 import { Square, Timer } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { CoachMessage } from "../../components/ui/CoachMessage";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { motivationMessages } from "../../data/challenge";
-import { estimateStepsFromPosition, formatDuration, formatPace } from "../../lib/geo/geo";
+import { formatDuration, formatPace } from "../../lib/geo/geo";
+import { analyzeRouteTrack } from "../../lib/geo/routeMatcher";
 import { localStore } from "../../lib/storage/localStore";
 import type { RunPoint, RunRecord } from "../../lib/types";
 import { validateRun } from "../../lib/validation/validateRun";
@@ -21,6 +22,7 @@ export function RunPage() {
   const [holdProgress, setHoldProgress] = useState(0);
   const [confirmStop, setConfirmStop] = useState(false);
   const holdTimer = useRef<number | null>(null);
+  const tracking = useMemo(() => analyzeRouteTrack(points, config), [config, points]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -52,8 +54,6 @@ export function RunPage() {
   }, []);
 
   useEffect(() => {
-    const reliablePoint = points.filter((point) => point.accuracyM <= config.gpsAccuracyReviewMaxM).at(-1) ?? null;
-    const activeEstimatedSteps = estimateStepsFromPosition(reliablePoint, config);
     const active: RunRecord = {
       id: "active-run",
       userId,
@@ -71,22 +71,21 @@ export function RunPage() {
       gpsAccuracyAvgM: null,
       gpsAccuracyMinM: null,
       gpsAccuracyMaxM: null,
-      estimatedSteps: activeEstimatedSteps,
-      pacePer100StepsSeconds: activeEstimatedSteps > 0 ? elapsed / (activeEstimatedSteps / 100) : null,
-      points
+      estimatedSteps: tracking.finalSteps,
+      pacePer100StepsSeconds: tracking.finalSteps > 0 ? elapsed / (tracking.finalSteps / 100) : null,
+      points,
+      trackingSummary: tracking
     };
     localStore.writeActiveRun(active);
-  }, [config, elapsed, points, startedAt, userId]);
+  }, [elapsed, points, startedAt, tracking, userId]);
 
   const latestPoint = points.at(-1) ?? null;
-  const latestReliablePoint = points.filter((point) => point.accuracyM <= config.gpsAccuracyReviewMaxM).at(-1) ?? null;
-  const gpsOk = Boolean(latestPoint && latestPoint.accuracyM <= config.gpsAccuracyReviewMaxM);
-  const steps = estimateStepsFromPosition(latestReliablePoint, config);
+  const gpsOk = tracking.confidenceLevel === "high" || (tracking.confidenceLevel === "estimated" && Boolean(latestPoint));
+  const gpsLabel = tracking.confidenceLevel === "high" ? "GPS OK" : tracking.confidenceLevel === "estimated" ? "GPS geschätzt" : "GPS ungenau";
+  const steps = tracking.finalSteps;
   const pacePer100 = steps > 0 ? elapsed / (steps / 100) : null;
   const coach = motivationMessages.find((item) => steps >= item.minSteps && steps < item.maxSteps)?.message ?? "Du hast es gleich geschafft.";
-  const altitudeGain = points.length > 1 && points[0].altitudeM && points.at(-1)?.altitudeM
-    ? Math.round((points.at(-1)?.altitudeM ?? 0) - (points[0].altitudeM ?? 0))
-    : Math.round((steps / config.totalSteps) * config.expectedElevationGainM);
+  const altitudeGain = Math.round(tracking.altitudeGainM ?? tracking.interpretedElevationGainM);
 
   if (!profile) {
     return <Navigate to="/login" replace />;
@@ -116,7 +115,8 @@ export function RunPage() {
       gpsAccuracyMaxM: validation.metrics.gpsAccuracyMax,
       estimatedSteps: validation.metrics.estimatedSteps,
       pacePer100StepsSeconds: validation.metrics.pacePer100Steps,
-      points: sourcePoints
+      points: sourcePoints,
+      trackingSummary: validation.tracking
     };
     await saveRun(run);
     localStorage.setItem("tusiger.lastRunId", run.id);
@@ -150,7 +150,7 @@ export function RunPage() {
         <h1>TUSIGER</h1>
         <p>Aktiver Lauf</p>
         <div className="run-dashboard">
-          <header><span className={`live-dot ${gpsOk ? "" : "warn"}`} /> {gpsOk ? "GPS OK" : "GPS ungenau"} <span>+{altitudeGain} m</span></header>
+          <header><span className={`live-dot ${gpsOk ? "" : "warn"}`} /> {gpsLabel} <span>+{altitudeGain} m</span></header>
           <strong className="big-timer">{formatDuration(elapsed)}</strong>
           <small>Zeit</small>
           <b>{steps} / {config.totalSteps}</b>

@@ -1,26 +1,40 @@
-import { defaultChallengeConfig } from "../../data/challenge";
+import { routeWaypoints } from "../../data/challenge";
 import type { RunPoint } from "../../lib/types";
 
 export function createSyntheticRunPoints(durationSeconds = 4140): RunPoint[] {
   const points: RunPoint[] = [];
   const now = Date.now() - durationSeconds * 1000;
-  const total = 34;
+  const total = 46;
+
+  function interpolate(progress: number) {
+    const totalSteps = routeWaypoints.at(-1)?.steps ?? 1150;
+    const steps = progress * totalSteps;
+    const segment =
+      routeWaypoints.slice(0, -1).find((waypoint, index) => {
+        const next = routeWaypoints[index + 1];
+        return steps >= waypoint.steps && steps <= next.steps;
+      }) ?? routeWaypoints[routeWaypoints.length - 2];
+    const next = routeWaypoints[routeWaypoints.indexOf(segment) + 1];
+    const span = Math.max(1, next.steps - segment.steps);
+    const t = Math.max(0, Math.min(1, (steps - segment.steps) / span));
+    return {
+      lat: segment.lat + (next.lat - segment.lat) * t,
+      lng: segment.lng + (next.lng - segment.lng) * t,
+      altitudeM: segment.altM + (next.altM - segment.altM) * t
+    };
+  }
 
   for (let index = 0; index < total; index += 1) {
-    const rawProgress = index / (total - 1);
-    const progress = index < 5 ? 0 : index > total - 6 ? 1 : rawProgress;
+    const progress = index / (total - 1);
+    const routePoint = interpolate(progress);
     points.push({
       recordedAt: new Date(now + progress * durationSeconds * 1000).toISOString(),
-      lat:
-        defaultChallengeConfig.startLat +
-        (defaultChallengeConfig.endLat - defaultChallengeConfig.startLat) * progress,
-      lng:
-        defaultChallengeConfig.startLng +
-        (defaultChallengeConfig.endLng - defaultChallengeConfig.startLng) * progress,
-      altitudeM: 427.6 + 233.5 * progress,
+      lat: routePoint.lat,
+      lng: routePoint.lng,
+      altitudeM: routePoint.altitudeM,
       altitudeAccuracyM: 6,
       accuracyM: index < 3 ? 8 : 5 + (index % 4),
-      speedMps: 0.13,
+      speedMps: 0.16,
       heading: 318
     });
   }

@@ -35,6 +35,64 @@ export type RunPoint = {
   heading: number | null;
 };
 
+export type TrackingConfidenceLevel = "high" | "estimated" | "low";
+
+export type RoutePointTelemetry = {
+  recordedAt: string;
+  rawLat: number;
+  rawLng: number;
+  projectedLat: number;
+  projectedLng: number;
+  segmentIndex: number;
+  progressSteps: number;
+  filteredSteps: number;
+  distanceToRouteM: number;
+  accuracyM: number;
+  rawAltitudeM: number | null;
+  expectedAltitudeM: number;
+  altitudeDeltaM: number | null;
+  rawSpeedMps: number | null;
+  routeSpeedMps: number | null;
+  confidence: number;
+  confidenceLevel: TrackingConfidenceLevel;
+  offRoute: boolean;
+  inferred: boolean;
+  flags: string[];
+};
+
+export type RouteTrackSummary = {
+  pointCount: number;
+  matchedPointCount: number;
+  highConfidencePointCount: number;
+  estimatedPointCount: number;
+  lowConfidencePointCount: number;
+  offRoutePointCount: number;
+  impossibleJumpCount: number;
+  backwardJumpCount: number;
+  largeGapCount: number;
+  longestGapSeconds: number;
+  finalSteps: number;
+  maxSteps: number;
+  progressRatio: number;
+  rawDistanceMeters: number;
+  projectedDistanceMeters: number;
+  routeDistanceMeters: number;
+  altitudeGainM: number | null;
+  interpretedElevationGainM: number;
+  averageConfidence: number;
+  confidenceLevel: TrackingConfidenceLevel;
+  routeAdherenceRatio: number;
+  lowConfidenceRatio: number;
+  offRouteRatio: number;
+  continuityScore: number;
+  altitudeConsistencyRatio: number | null;
+  filteredSpeedMps: number | null;
+  rawSpeedMps: number | null;
+  pacePer100Steps: number | null;
+  inferredSteps: number;
+  telemetry: RoutePointTelemetry[];
+};
+
 export type RunRecord = {
   id: string;
   userId: string;
@@ -55,6 +113,7 @@ export type RunRecord = {
   estimatedSteps: number;
   pacePer100StepsSeconds: number | null;
   points: RunPoint[];
+  trackingSummary?: RouteTrackSummary;
 };
 
 export type Profile = {
@@ -135,5 +194,16 @@ export type ValidationResult = {
     pacePer100Steps: number | null;
     pointCount: number;
     routeDistanceMeters: number;
+    routeProgressSteps: number;
+    maxProgressSteps: number;
+    routeConfidenceAverage: number;
+    routeConfidenceLevel: TrackingConfidenceLevel;
+    routeAdherenceRatio: number;
+    continuityScore: number;
+    offRoutePointCount: number;
+    lowConfidencePointCount: number;
+    impossibleJumpCount: number;
+    inferredSteps: number;
   };
+  tracking: RouteTrackSummary;
 };

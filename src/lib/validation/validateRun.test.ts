@@ -42,8 +42,17 @@ describe("validateRun", () => {
   });
 
   it("sends poor GPS accuracy to review or invalid", () => {
-    const points = createSyntheticRunPoints().map((point) => ({ ...point, accuracyM: 48 }));
+    const points = createSyntheticRunPoints().map((point) => ({ ...point, accuracyM: 120 }));
     expect(runFor(points).status).toBe("invalid");
+  });
+
+  it("keeps a complete route with slightly weak forest GPS in review instead of faking certainty", () => {
+    const points = createSyntheticRunPoints().map((point) => ({ ...point, accuracyM: 52 }));
+    const result = runFor(points);
+
+    expect(result.status).toBe("needs_review");
+    expect(result.metrics.estimatedSteps).toBe(defaultChallengeConfig.totalSteps);
+    expect(result.metrics.routeConfidenceAverage).toBeGreaterThan(0.45);
   });
 
   it("flags elevation outside the valid range", () => {

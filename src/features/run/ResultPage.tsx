@@ -14,6 +14,9 @@ export function ResultPage() {
   const run = runs.find((item) => item.id === runId) ?? runs[0];
   const validationLabel =
     run?.status === "valid" ? "Validiert" : run?.status === "invalid" ? "Ungültig" : "Prüfung";
+  const confidenceText = run?.trackingSummary
+    ? `${Math.round(run.trackingSummary.averageConfidence * 100)} % · ${Math.round(run.trackingSummary.routeAdherenceRatio * 100)} % Korridor`
+    : "nicht verfügbar";
 
   if (!run) {
     return (
@@ -59,6 +62,7 @@ export function ResultPage() {
           <p><ShieldCheck /> GPS-Genauigkeit <span>± {Math.round(run.gpsAccuracyAvgM ?? 0)} m</span></p>
           <p><Mountain /> Höhenmeter Anstieg <span>{Math.round(run.elevationGainM ?? 0)} m</span></p>
           <p><Timer /> Pace Durchschnitt <span>{formatPace(run.pacePer100StepsSeconds)}</span></p>
+          <p><ShieldCheck /> Signalqualität <span>{confidenceText}</span></p>
           <p><ShieldCheck /> Prüfungsdetails <span>{run.validationReasons.join(" ")}</span></p>
         </GlassPanel>
         <ValidationBadge status={run.status} />
