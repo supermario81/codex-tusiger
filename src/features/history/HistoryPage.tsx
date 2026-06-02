@@ -6,7 +6,6 @@ import { GlassPanel } from "../../components/ui/Card";
 import { historyFallback } from "../../data/challenge";
 import { useApp } from "../../app/AppContext";
 
-export const TWINT_DONATION_URL = "https://sbs.twint.ch/sbs/webshop/v2/payment?nocache=a01d4353-a17b-448a-90f3-971f3413a795&returnAppScheme=twint-issuer2#token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJlMjQwMzk5OTMwYWY0NGI0YjkxNGMxN2FjMjE5NTFiMCIsIm5iZiI6MTc3OTM5NDk3MywiZXhwIjoxNzc5Mzk1OTMzLCJpYXQiOjE3NzkzOTQ5NzN9.gBpEY8gKVEpUGCwpeffvFUoOWtKLlxvT2XyHRsTqcS3yOu0FnG3xszDf22QmvwP3_FtJAqBpp6cJvIzQHPLzumNPvLycHW4484k45Ol-4SXtmVqbgtSPRCbU-7kLwAiQepTlaDs3qFvPnYG8wZlkTL82OOnQK_qwcZZ8Rt_cwTySLA_QE6sASqcJmtOoOOYrcWbVHlfUDEa2L8pe9d2blWBemyefwxAFrstXyB4oasZRDiFDvbrwjUhQAKzlN3lXWzq0QRnf4BIpLebU61Ik99JVU_-Z75yP2zgJxTlmIShX4f21JaPDnEAzjcb_7nJfIYvscVuWlUGvx0aGBPpSqQ";
 const articleUrl = "https://lenzburger-nachrichten.ch/zofingen/detail/die-born-ranger-unterhalten-seit-39-jahren-hoerbis-vermaechtnis";
 
 export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) {
