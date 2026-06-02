@@ -55,10 +55,6 @@ export function normalizeInviteCode(value: string): string {
   return parseInviteInput(value);
 }
 
-export function isValidInviteCode(value: string): boolean {
-  return /^TUS[A-Z0-9]{6,}$/i.test(parseInviteInput(value));
-}
-
 export function getInviteUrl(inviteCode: string): string {
   return `${getAppBaseUrl()}#/join/${normalizeInviteCode(inviteCode)}`;
 }
