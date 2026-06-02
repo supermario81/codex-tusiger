@@ -1,8 +1,10 @@
-import type { RunRecord } from "../types";
+import type { Group, Profile, RunRecord } from "../types";
 
 const keys = {
+  profile: "tusiger.profile",
   runs: "tusiger.runs",
-  activeRun: "tusiger.activeRun"
+  activeRun: "tusiger.activeRun",
+  groups: "tusiger.groups"
 };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -19,7 +21,11 @@ function writeJson<T>(key: string, value: T): void {
 }
 
 export const localStore = {
+  readProfile: () => readJson<Profile | null>(keys.profile, null),
+  writeProfile: (profile: Profile) => writeJson(keys.profile, profile),
+  clearProfile: () => localStorage.removeItem(keys.profile),
   readRuns: () => readJson<RunRecord[]>(keys.runs, []),
+  writeRuns: (runs: RunRecord[]) => writeJson(keys.runs, runs),
   upsertRun: (run: RunRecord) => {
     const runs = readJson<RunRecord[]>(keys.runs, []);
     const next = [run, ...runs.filter((item) => item.id !== run.id)];
@@ -27,5 +33,7 @@ export const localStore = {
   },
   readActiveRun: () => readJson<RunRecord | null>(keys.activeRun, null),
   writeActiveRun: (run: RunRecord) => writeJson(keys.activeRun, run),
-  clearActiveRun: () => localStorage.removeItem(keys.activeRun)
+  clearActiveRun: () => localStorage.removeItem(keys.activeRun),
+  readGroups: () => readJson<Group[]>(keys.groups, []),
+  writeGroups: (groups: Group[]) => writeJson(keys.groups, groups)
 };

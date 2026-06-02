@@ -1,4 +1,4 @@
-import type { ChallengeConfig, HistoryItem, LegalPage, MotivationMessage } from "../lib/types";
+import type { ChallengeConfig, HistoryItem, LegalPage, MotivationMessage, PublicRun } from "../lib/types";
 
 export const defaultChallengeConfig: ChallengeConfig = {
   id: "tusiger-default",
@@ -157,30 +157,55 @@ export const legalFallback: LegalPage[] = [
   }
 ];
 
-export interface RouteWaypoint {
-  steps: number;
-  lat: number;
-  lng: number;
-  altM: number;
-}
-
-// Gemessene Referenzpunkte entlang der Route (03.05.2025 & 10.05.2025).
-export const routeWaypoints: RouteWaypoint[] = [
-  { steps: 0, lat: 47.315206, lng: 7.886942, altM: 421 },
-  { steps: 100, lat: 47.315443, lng: 7.886554, altM: 449 },
-  { steps: 200, lat: 47.3154, lng: 7.8862, altM: 460 },
-  { steps: 250, lat: 47.3159, lng: 7.8862, altM: 471 },
-  { steps: 300, lat: 47.316189, lng: 7.885925, altM: 494 },
-  { steps: 350, lat: 47.3166, lng: 7.8854, altM: 513 },
-  { steps: 400, lat: 47.3168, lng: 7.8852, altM: 524 },
-  { steps: 500, lat: 47.3171, lng: 7.8848, altM: 540 },
-  { steps: 550, lat: 47.317009, lng: 7.885031, altM: 529 },
-  { steps: 600, lat: 47.3174, lng: 7.8844, altM: 551 },
-  { steps: 650, lat: 47.3175, lng: 7.8844, altM: 559 },
-  { steps: 700, lat: 47.317886, lng: 7.884093, altM: 570 },
-  { steps: 777, lat: 47.318, lng: 7.8839, altM: 585 },
-  { steps: 800, lat: 47.3181, lng: 7.8838, altM: 590 },
-  { steps: 900, lat: 47.3183, lng: 7.8835, altM: 616 },
-  { steps: 1000, lat: 47.3186, lng: 7.8832, altM: 635 },
-  { steps: 1150, lat: 47.3189, lng: 7.8829, altM: 667 }
+export const demoLeaderboard: PublicRun[] = [
+  {
+    id: "run-1",
+    rank: 1,
+    nickname: "TrailMax",
+    avatarUrl: "",
+    durationSeconds: 5027,
+    date: "2026-05-16",
+    status: "valid",
+    isCurrentUser: false
+  },
+  {
+    id: "run-2",
+    rank: 2,
+    nickname: "AlpineRunner",
+    avatarUrl: "",
+    durationSeconds: 5112,
+    date: "2026-05-16",
+    status: "valid",
+    isCurrentUser: false
+  },
+  {
+    id: "run-3",
+    rank: 3,
+    nickname: "BergFex",
+    avatarUrl: "",
+    durationSeconds: 5225,
+    date: "2026-05-16",
+    status: "valid",
+    isCurrentUser: false
+  },
+  {
+    id: "run-current",
+    rank: 642,
+    nickname: "Du",
+    avatarUrl: "",
+    durationSeconds: 9296,
+    date: "2026-05-16",
+    status: "valid",
+    isCurrentUser: true
+  },
+  {
+    id: "run-643",
+    rank: 643,
+    nickname: "WaldLäuferin",
+    avatarUrl: "",
+    durationSeconds: 9321,
+    date: "2026-05-16",
+    status: "valid",
+    isCurrentUser: false
+  }
 ];

@@ -154,14 +154,14 @@ Für einen sauberen Auth-Test kann `supabase/reset/clear_test_users.sql` im Supa
 
 Die App erstellt keine Zahlungen und empfängt keine Spenden. Die Spende geht direkt an die zuständige freiwillige Arbeitsgruppe / Born Rangers Team.
 
-Lege die offiziellen Bilddateien in `public/images/` ab:
+Lege die offiziellen Flyer-Dateien in `public/images/` ab:
 
 ```text
 public/images/twint-1000er-staegli.jpg
-public/images/born-tusiger-rangers.webp
+public/images/flyer-1000er-staegli.jpg
 ```
 
-Kein QR-Code wird künstlich generiert. Der TWINT-Hinweis wird als offizielles QR-Bild angezeigt.
+Kein QR-Code wird künstlich generiert.
 
 ## iPhone PWA
 

@@ -9,37 +9,26 @@ import { formatDuration } from "../../lib/geo/geo";
 import { useApp } from "../../app/AppContext";
 import { useEffect } from "react";
 
-function playFanfare() {
+function playSuccessSound() {
   const audioFile = `${import.meta.env.BASE_URL}audio/victory.mp3`;
   const audio = new Audio(audioFile);
-  audio.volume = 0.6;
+  audio.volume = 0.55;
   void audio.play().catch(() => {
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    const now = ctx.currentTime;
-    const notes = [
-      { freq: 523.25, start: 0, dur: 0.2 },
-      { freq: 659.25, start: 0.22, dur: 0.2 },
-      { freq: 783.99, start: 0.44, dur: 0.2 },
-      { freq: 1046.5, start: 0.66, dur: 0.7 },
-      { freq: 783.99, start: 0.68, dur: 0.68 },
-      { freq: 659.25, start: 0.7, dur: 0.66 }
-    ];
-
-    notes.forEach(({ freq, start, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, now + start);
-      gain.gain.linearRampToValueAtTime(0.22, now + start + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now + start);
-      osc.stop(now + start + dur + 0.05);
+    const context = new AudioContextClass();
+    const now = context.currentTime;
+    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "triangle";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, now + index * 0.14);
+      gain.gain.linearRampToValueAtTime(0.16, now + index * 0.14 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.14 + 0.28);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(now + index * 0.14);
+      oscillator.stop(now + index * 0.14 + 0.3);
     });
   });
 }
@@ -50,7 +39,7 @@ export function FinishPage() {
   const run = localStore.readRuns().find((item) => item.id === runId);
 
   useEffect(() => {
-    playFanfare();
+    playSuccessSound();
   }, []);
 
   if (!run) {
