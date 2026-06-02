@@ -1,3 +1,4 @@
+import { routeWaypoints, type RouteWaypoint } from "../../data/challenge";
 import type { ChallengeConfig, RunPoint } from "../types";
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -71,14 +72,54 @@ export function estimateStepsFromPosition(point: RunPoint | null, config: Challe
     return 0;
   }
 
-  const start = { lat: config.startLat, lng: config.startLng };
-  const end = { lat: config.endLat, lng: config.endLng };
-  const routeDistance = haversineDistanceMeters(start, end);
-  const fromStart = haversineDistanceMeters(start, point);
-  const toEnd = haversineDistanceMeters(point, end);
-  const alongRouteProgress = Math.max(0, Math.min(1, (routeDistance + fromStart - toEnd) / (2 * routeDistance)));
+  let nearestIndex = 0;
+  let nearestDist = Infinity;
+  for (let i = 0; i < routeWaypoints.length; i += 1) {
+    const distance = haversineDistanceMeters(point, routeWaypoints[i]);
+    if (distance < nearestDist) {
+      nearestDist = distance;
+      nearestIndex = i;
+    }
+  }
 
-  return Math.round(alongRouteProgress * config.totalSteps);
+  const previous = routeWaypoints[Math.max(0, nearestIndex - 1)];
+  const nearest = routeWaypoints[nearestIndex];
+  const next = routeWaypoints[Math.min(routeWaypoints.length - 1, nearestIndex + 1)];
+
+  function projectOnSegment(
+    p: { lat: number; lng: number },
+    a: RouteWaypoint,
+    b: RouteWaypoint
+  ): { steps: number; distToLine: number } {
+    const segmentLength = haversineDistanceMeters(a, b);
+    if (segmentLength < 1) {
+      return { steps: a.steps, distToLine: haversineDistanceMeters(p, a) };
+    }
+
+    const fromA = haversineDistanceMeters(a, p);
+    const fromB = haversineDistanceMeters(b, p);
+    const t = Math.max(
+      0,
+      Math.min(1, (segmentLength * segmentLength + fromA * fromA - fromB * fromB) / (2 * segmentLength * segmentLength))
+    );
+    const steps = a.steps + t * (b.steps - a.steps);
+    const distToLine = Math.sqrt(Math.max(0, fromA * fromA - t * segmentLength * (t * segmentLength)));
+    return { steps, distToLine };
+  }
+
+  const firstSegment = projectOnSegment(point, previous, nearest);
+  const secondSegment = projectOnSegment(point, nearest, next);
+  const best = firstSegment.distToLine <= secondSegment.distToLine ? firstSegment : secondSegment;
+
+  if (point.altitudeM !== null && point.altitudeM > 350 && point.altitudeM < 750) {
+    const altStart = routeWaypoints[0].altM;
+    const altEnd = routeWaypoints[routeWaypoints.length - 1].altM;
+    const altProgress = Math.max(0, Math.min(1, (point.altitudeM - altStart) / (altEnd - altStart)));
+    const altSteps = Math.round(altProgress * config.totalSteps);
+    return Math.round(Math.max(0, Math.min(config.totalSteps, best.steps * 0.7 + altSteps * 0.3)));
+  }
+
+  return Math.round(Math.max(0, Math.min(config.totalSteps, best.steps)));
 }
 
 export function formatDuration(totalSeconds: number): string {
