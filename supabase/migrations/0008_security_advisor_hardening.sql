@@ -50,16 +50,15 @@ grant execute on function public.join_group_by_invite(text) to authenticated;
 grant execute on function public.leave_tusiger_group(uuid) to authenticated;
 grant execute on function public.tusiger_invite_code(text) to authenticated;
 
--- Legacy/manual helper found by Security Advisor. It is not used by Tusiger and
--- should not be callable from the API.
+-- Legacy/manual helper found by Security Advisor. It should not be callable from
+-- the API. Some projects still have an event trigger depending on this helper,
+-- so revoke execute rights but do not force-drop it here.
 do $$
 begin
   revoke all on function public.rls_auto_enable() from public, anon, authenticated;
 exception
   when undefined_function then null;
 end $$;
-
-drop function if exists public.rls_auto_enable();
 
 -- Keep the avatars bucket public for direct image rendering, but remove the broad
 -- SELECT policy that allows unauthenticated listing of all object names.
