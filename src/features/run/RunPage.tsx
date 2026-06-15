@@ -6,23 +6,43 @@ import { PageShell } from "../../components/layout/PageShell";
 import { CoachMessage } from "../../components/ui/CoachMessage";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { motivationMessages } from "../../data/challenge";
+import { primeRunAudio } from "../../lib/audio/runAudio";
+import { debugRunEvent } from "../../lib/debug/runDebug";
 import { formatDuration, formatPace } from "../../lib/geo/geo";
 import { analyzeRouteTrack } from "../../lib/geo/routeMatcher";
 import { localStore } from "../../lib/storage/localStore";
-import type { RunPoint, RunRecord } from "../../lib/types";
+import type { RouteTrackSummary, RunPoint, RunRecord } from "../../lib/types";
 import { validateRun } from "../../lib/validation/validateRun";
 import { positionToRunPoint } from "./runUtils";
+
+function compactTrackingSummary(summary: RouteTrackSummary, telemetryLimit = 160): RouteTrackSummary {
+  if (summary.telemetry.length <= telemetryLimit) {
+    return summary;
+  }
+
+  return {
+    ...summary,
+    telemetry: summary.telemetry.slice(-telemetryLimit)
+  };
+}
 
 export function RunPage() {
   const { config, profile, saveRun, userId } = useApp();
   const navigate = useNavigate();
-  const [startedAt] = useState(() => new Date().toISOString());
-  const [elapsed, setElapsed] = useState(0);
-  const [points, setPoints] = useState<RunPoint[]>(() => localStore.readActiveRun()?.points ?? []);
+  const restoredRun = useMemo(() => localStore.readActiveRun(), []);
+  const [startedAt] = useState(() => restoredRun?.startedAt ?? new Date().toISOString());
+  const [elapsed, setElapsed] = useState(() => restoredRun?.durationSeconds ?? 0);
+  const [fullPoints, setFullPoints] = useState<RunPoint[]>(() => restoredRun?.points ?? []);
   const [holdProgress, setHoldProgress] = useState(0);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [finishError, setFinishError] = useState("");
   const holdTimer = useRef<number | null>(null);
-  const tracking = useMemo(() => analyzeRouteTrack(points, config), [config, points]);
+  const holdCompleted = useRef(false);
+  const isFinishingRef = useRef(false);
+  const lastPersistedAt = useRef(0);
+  const lastLoggedPointCount = useRef(0);
+  const tracking = useMemo(() => analyzeRouteTrack(fullPoints, config), [config, fullPoints]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -41,19 +61,44 @@ export function RunPage() {
 
   useEffect(() => {
     if (!navigator.geolocation) {
+      debugRunEvent("geolocation_unavailable");
       return;
     }
 
     const watchId = navigator.geolocation.watchPosition(
-      (position) => setPoints((current) => [...current, positionToRunPoint(position)].slice(-300)),
-      () => undefined,
+      (position) => {
+        const point = positionToRunPoint(position);
+        setFullPoints((current) => {
+          const next = [...current, point];
+          const shouldLog =
+            next.length === 1 ||
+            next.length - lastLoggedPointCount.current >= 25 ||
+            point.accuracyM > config.gpsAccuracyReviewMaxM;
+          if (shouldLog) {
+            lastLoggedPointCount.current = next.length;
+            debugRunEvent("gps_point", {
+              pointCount: next.length,
+              accuracyM: point.accuracyM,
+              altitudeM: point.altitudeM,
+              speedMps: point.speedMps
+            });
+          }
+          return next;
+        });
+      },
+      (error) => debugRunEvent("gps_error", { code: error.code, message: error.message }),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10_000 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  }, [config.gpsAccuracyReviewMaxM]);
 
   useEffect(() => {
+    const now = Date.now();
+    if (now - lastPersistedAt.current < 2500 && fullPoints.length > 0) {
+      return;
+    }
+    lastPersistedAt.current = now;
     const active: RunRecord = {
       id: "active-run",
       userId,
@@ -63,23 +108,43 @@ export function RunPage() {
       status: "draft",
       validationScore: 0,
       validationReasons: [],
-      startLat: points[0]?.lat ?? null,
-      startLng: points[0]?.lng ?? null,
-      endLat: points.at(-1)?.lat ?? null,
-      endLng: points.at(-1)?.lng ?? null,
+      startLat: fullPoints[0]?.lat ?? null,
+      startLng: fullPoints[0]?.lng ?? null,
+      endLat: fullPoints.at(-1)?.lat ?? null,
+      endLng: fullPoints.at(-1)?.lng ?? null,
       elevationGainM: null,
       gpsAccuracyAvgM: null,
       gpsAccuracyMinM: null,
       gpsAccuracyMaxM: null,
       estimatedSteps: tracking.finalSteps,
       pacePer100StepsSeconds: tracking.finalSteps > 0 ? elapsed / (tracking.finalSteps / 100) : null,
-      points,
-      trackingSummary: tracking
+      points: fullPoints,
+      trackingSummary: compactTrackingSummary(tracking)
     };
     localStore.writeActiveRun(active);
-  }, [elapsed, points, startedAt, tracking, userId]);
+  }, [elapsed, fullPoints, startedAt, tracking, userId]);
 
-  const latestPoint = points.at(-1) ?? null;
+  useEffect(() => {
+    if (fullPoints.length === 0) {
+      return;
+    }
+    if (fullPoints.length % 25 !== 0 && tracking.finalSteps < config.totalSteps) {
+      return;
+    }
+    debugRunEvent("route_progress", {
+      pointCount: fullPoints.length,
+      finalSteps: tracking.finalSteps,
+      maxSteps: tracking.maxSteps,
+      confidence: tracking.averageConfidence,
+      confidenceLevel: tracking.confidenceLevel,
+      routeAdherenceRatio: tracking.routeAdherenceRatio,
+      continuityScore: tracking.continuityScore,
+      altitudeGainM: tracking.altitudeGainM,
+      interpretedElevationGainM: tracking.interpretedElevationGainM
+    });
+  }, [config.totalSteps, fullPoints.length, tracking]);
+
+  const latestPoint = fullPoints.at(-1) ?? null;
   const gpsOk = tracking.confidenceLevel === "high" || (tracking.confidenceLevel === "estimated" && Boolean(latestPoint));
   const gpsLabel = tracking.confidenceLevel === "high" ? "GPS OK" : tracking.confidenceLevel === "estimated" ? "GPS geschätzt" : "GPS ungenau";
   const steps = tracking.finalSteps;
@@ -91,18 +156,32 @@ export function RunPage() {
     return <Navigate to="/login" replace />;
   }
 
-  async function finishRun() {
-    const finishedAt = new Date(new Date(startedAt).getTime() + elapsed * 1000).toISOString();
-    const sourcePoints = points;
+  async function finishRun(trigger: "hold" | "confirm" = "confirm") {
+    if (isFinishingRef.current) {
+      debugRunEvent("finish_ignored_duplicate", { trigger, pointCount: fullPoints.length });
+      return;
+    }
+
+    primeRunAudio();
+    cancelHold();
+    setConfirmStop(false);
+    setFinishError("");
+    isFinishingRef.current = true;
+    setIsFinishing(true);
+
+    const sourcePoints = [...fullPoints];
+    const actualElapsed = Math.max(elapsed, (Date.now() - new Date(startedAt).getTime()) / 1000);
+    const finishedAt = new Date(new Date(startedAt).getTime() + actualElapsed * 1000).toISOString();
     const validation = validateRun({ startedAt, endedAt: finishedAt }, sourcePoints, config);
     const forceReview = localStorage.getItem("tusiger.forceReview") === "true";
+    const status = forceReview && validation.status === "valid" ? "needs_review" : validation.status;
     const run: RunRecord = {
       id: crypto.randomUUID(),
       userId,
       startedAt,
       endedAt: finishedAt,
       durationSeconds: validation.metrics.durationSeconds,
-      status: forceReview && validation.status === "valid" ? "needs_review" : validation.status,
+      status,
       validationScore: validation.score,
       validationReasons: validation.reasons,
       startLat: sourcePoints[0]?.lat ?? null,
@@ -118,22 +197,62 @@ export function RunPage() {
       points: sourcePoints,
       trackingSummary: validation.tracking
     };
-    await saveRun(run);
-    localStorage.setItem("tusiger.lastRunId", run.id);
-    localStore.clearActiveRun();
-    navigate("/finish");
+
+    debugRunEvent("validation_result", {
+      trigger,
+      status,
+      validationStatus: validation.status,
+      pointCount: sourcePoints.length,
+      durationSeconds: validation.metrics.durationSeconds,
+      estimatedSteps: validation.metrics.estimatedSteps,
+      routeProgressSteps: validation.metrics.routeProgressSteps,
+      maxProgressSteps: validation.metrics.maxProgressSteps,
+      elevationGain: validation.metrics.elevationGain,
+      interpretedElevationGainM: validation.tracking.interpretedElevationGainM,
+      score: validation.score,
+      reasons: validation.reasons
+    });
+
+    try {
+      await saveRun(run);
+      localStorage.setItem("tusiger.lastRunId", run.id);
+      localStore.clearActiveRun();
+      navigate("/finish");
+    } catch (error) {
+      isFinishingRef.current = false;
+      setIsFinishing(false);
+      setFinishError(error instanceof Error ? error.message : "Lauf konnte nicht gespeichert werden.");
+      debugRunEvent("finish_save_failed", { message: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   function startHold() {
+    if (isFinishingRef.current) {
+      return;
+    }
+    primeRunAudio();
+    holdCompleted.current = false;
     const started = Date.now();
     holdTimer.current = window.setInterval(() => {
       const progress = (Date.now() - started) / 1200;
       setHoldProgress(Math.min(1, progress));
       if (progress >= 1) {
-        cancelHold();
-        void finishRun();
+        holdCompleted.current = true;
+        void finishRun("hold");
       }
     }, 80);
+  }
+
+  function openStopConfirm() {
+    if (isFinishingRef.current) {
+      return;
+    }
+    if (holdCompleted.current) {
+      holdCompleted.current = false;
+      return;
+    }
+    primeRunAudio();
+    setConfirmStop(true);
   }
 
   function cancelHold() {
@@ -158,7 +277,7 @@ export function RunPage() {
           <ProgressBar value={steps} max={config.totalSteps} />
           <div className="run-metrics">
             <span><Timer /> Pace / 100<br /><strong>{formatPace(pacePer100)}</strong></span>
-            <span>GPS Punkte<br /><strong>{points.length}</strong></span>
+            <span>GPS Punkte<br /><strong>{fullPoints.length}</strong></span>
             <span>Höhenmeter<br /><strong>{altitudeGain}</strong></span>
           </div>
         </div>
@@ -166,21 +285,27 @@ export function RunPage() {
         <button
           className="stop-button"
           type="button"
-          onClick={() => setConfirmStop(true)}
+          disabled={isFinishing}
+          aria-busy={isFinishing}
+          onClick={openStopConfirm}
           onPointerDown={startHold}
           onPointerUp={cancelHold}
           onPointerCancel={cancelHold}
+          onPointerLeave={cancelHold}
           style={{ background: `linear-gradient(90deg, #8d4a37 ${holdProgress * 100}%, rgba(112,54,40,.86) ${holdProgress * 100}%)` }}
         >
-          <span><Square /></span> Lauf beenden
+          <span><Square /></span> {isFinishing ? "Speichern..." : "Lauf beenden"}
         </button>
+        {finishError ? <p className="form-error">{finishError}</p> : null}
         {confirmStop ? (
           <div className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Lauf beenden bestätigen">
             <div>
               <h2>Lauf beenden?</h2>
               <p>Tippe bestätigen oder halte den roten Button 1.2 Sekunden gedrückt.</p>
               <button type="button" onClick={() => setConfirmStop(false)}>Weiterlaufen</button>
-              <button type="button" onClick={() => void finishRun()}>Beenden bestätigen</button>
+              <button type="button" disabled={isFinishing} onClick={() => void finishRun("confirm")}>
+                {isFinishing ? "Speichern..." : "Beenden bestätigen"}
+              </button>
             </div>
           </div>
         ) : null}

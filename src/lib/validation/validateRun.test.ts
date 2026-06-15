@@ -62,4 +62,44 @@ describe("validateRun", () => {
     }));
     expect(runFor(points).status).toBe("invalid");
   });
+
+  it("accepts a complete route when browser altitude is unusable but route evidence is strong", () => {
+    const points = createSyntheticRunPoints().map((point) => ({
+      ...point,
+      altitudeM: 500,
+      altitudeAccuracyM: 120
+    }));
+    const result = runFor(points);
+
+    expect(result.status).toBe("valid");
+    expect(result.metrics.estimatedSteps).toBe(defaultChallengeConfig.totalSteps);
+    expect(result.reasons).toContain("GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
+  });
+
+  it("requires the full run track instead of accepting only a truncated finish buffer", () => {
+    const fullTrack = createSyntheticRunPoints(920);
+    const finishOnlyBuffer = fullTrack.slice(-12);
+
+    expect(runFor(fullTrack, 920).status).toBe("valid");
+    expect(runFor(finishOnlyBuffer, 920).status).toBe("invalid");
+  });
+
+  it("recovers a valid complete run when the first GPS fix is noisy but the early route lock is plausible", () => {
+    const points = createSyntheticRunPoints(920).map((point, index) =>
+      index < 5
+        ? {
+            ...point,
+            lat: point.lat + 0.001,
+            lng: point.lng + 0.001,
+            accuracyM: 95,
+            altitudeAccuracyM: 120
+          }
+        : point
+    );
+    const result = runFor(points, 920);
+
+    expect(result.status).toBe("valid");
+    expect(result.reasons).toContain("Startzone über frühen Routenlock plausibel.");
+    expect(result.metrics.estimatedSteps).toBe(defaultChallengeConfig.totalSteps);
+  });
 });

@@ -1,4 +1,5 @@
 import { Download, Flag, LocateFixed, Map, Mountain, Share2, ShieldCheck, Timer } from "lucide-react";
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
@@ -7,16 +8,16 @@ import { GlassPanel } from "../../components/ui/Card";
 import { MetricCard } from "../../components/ui/MetricCard";
 import { ValidationBadge } from "../../components/ui/StatusBadge";
 import { formatDuration, formatPace } from "../../lib/geo/geo";
+import { localStore } from "../../lib/storage/localStore";
 
 export function ResultPage() {
   const { runId } = useParams();
   const { runs } = useApp();
-  const run = runs.find((item) => item.id === runId) ?? runs[0];
-  const validationLabel =
-    run?.status === "valid" ? "Validiert" : run?.status === "invalid" ? "Ungültig" : "Prüfung";
-  const confidenceText = run?.trackingSummary
-    ? `${Math.round(run.trackingSummary.averageConfidence * 100)} % · ${Math.round(run.trackingSummary.routeAdherenceRatio * 100)} % Korridor`
-    : "nicht verfügbar";
+  const storedRun = useMemo(
+    () => runId ? localStore.readRuns().find((item) => item.id === runId) ?? null : null,
+    [runId]
+  );
+  const run = runs.find((item) => item.id === runId) ?? storedRun;
 
   if (!run) {
     return (
@@ -26,12 +27,19 @@ export function ResultPage() {
     );
   }
 
+  const selectedRun = run;
+  const validationLabel =
+    selectedRun.status === "valid" ? "Validiert" : selectedRun.status === "invalid" ? "Ungültig" : "Prüfung";
+  const confidenceText = selectedRun.trackingSummary
+    ? `${Math.round(selectedRun.trackingSummary.averageConfidence * 100)} % · ${Math.round(selectedRun.trackingSummary.routeAdherenceRatio * 100)} % Korridor`
+    : "nicht verfügbar";
+
   function exportJson() {
-    const blob = new Blob([JSON.stringify(run, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(selectedRun, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tusiger-run-${run.id}.json`;
+    link.download = `tusiger-run-${selectedRun.id}.json`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -40,11 +48,11 @@ export function ResultPage() {
     <PageShell back nav={false}>
       <section className="result-page">
         <h1>Laufbericht</h1>
-        <p>{new Date(run.startedAt).toLocaleString("de-CH")}</p>
+        <p>{new Date(selectedRun.startedAt).toLocaleString("de-CH")}</p>
         <GlassPanel className="metric-grid">
-          <MetricCard icon={<Timer />} label="Gesamtzeit" value={formatDuration(run.durationSeconds)} meta="hh:mm:ss" />
-          <MetricCard icon={<Flag />} label="Stufen" value={String(run.estimatedSteps)} meta="Schritte" />
-          <MetricCard icon={<Mountain />} label="Höhenmeter" value={`${Math.round(run.elevationGainM ?? 0)} m`} meta="Anstieg" />
+          <MetricCard icon={<Timer />} label="Gesamtzeit" value={formatDuration(selectedRun.durationSeconds)} meta="hh:mm:ss" />
+          <MetricCard icon={<Flag />} label="Stufen" value={String(selectedRun.estimatedSteps)} meta="Schritte" />
+          <MetricCard icon={<Mountain />} label="Höhenmeter" value={`${Math.round(selectedRun.elevationGainM ?? 0)} m`} meta="Anstieg" />
           <MetricCard icon={<ShieldCheck />} label="Validierung" value={validationLabel} meta="GPS & Regeln" />
         </GlassPanel>
         <GlassPanel className="route-card">
@@ -57,15 +65,15 @@ export function ResultPage() {
         </GlassPanel>
         <GlassPanel className="details-list">
           <h2>Details</h2>
-          <p><LocateFixed /> Startkoordinaten <span>{run.startLat?.toFixed(6)}, {run.startLng?.toFixed(6)}</span></p>
-          <p><Flag /> Zielkoordinaten <span>{run.endLat?.toFixed(6)}, {run.endLng?.toFixed(6)}</span></p>
-          <p><ShieldCheck /> GPS-Genauigkeit <span>± {Math.round(run.gpsAccuracyAvgM ?? 0)} m</span></p>
-          <p><Mountain /> Höhenmeter Anstieg <span>{Math.round(run.elevationGainM ?? 0)} m</span></p>
-          <p><Timer /> Pace Durchschnitt <span>{formatPace(run.pacePer100StepsSeconds)}</span></p>
+          <p><LocateFixed /> Startkoordinaten <span>{selectedRun.startLat?.toFixed(6)}, {selectedRun.startLng?.toFixed(6)}</span></p>
+          <p><Flag /> Zielkoordinaten <span>{selectedRun.endLat?.toFixed(6)}, {selectedRun.endLng?.toFixed(6)}</span></p>
+          <p><ShieldCheck /> GPS-Genauigkeit <span>± {Math.round(selectedRun.gpsAccuracyAvgM ?? 0)} m</span></p>
+          <p><Mountain /> Höhenmeter Anstieg <span>{Math.round(selectedRun.elevationGainM ?? 0)} m</span></p>
+          <p><Timer /> Pace Durchschnitt <span>{formatPace(selectedRun.pacePer100StepsSeconds)}</span></p>
           <p><ShieldCheck /> Signalqualität <span>{confidenceText}</span></p>
-          <p><ShieldCheck /> Prüfungsdetails <span>{run.validationReasons.join(" ")}</span></p>
+          <p><ShieldCheck /> Prüfungsdetails <span>{selectedRun.validationReasons.join(" ")}</span></p>
         </GlassPanel>
-        <ValidationBadge status={run.status} />
+        <ValidationBadge status={selectedRun.status} />
         <Link to="/leaderboard"><Button>In Rangliste ansehen</Button></Link>
         <Button variant="secondary" icon={<Share2 />}>Bericht teilen</Button>
         <Button variant="glass" icon={<Download />} onClick={exportJson}>JSON exportieren</Button>

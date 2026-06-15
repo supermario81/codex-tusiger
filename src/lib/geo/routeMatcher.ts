@@ -108,6 +108,18 @@ function scoreByRange(value: number, good: number, review: number, poor: number)
   return 0.12;
 }
 
+function altitudeReliability(point: RunPoint) {
+  if (point.altitudeM === null || point.altitudeM <= 350 || point.altitudeM >= 750) {
+    return 0;
+  }
+
+  if (point.altitudeAccuracyM === null) {
+    return 0.35;
+  }
+
+  return scoreByRange(point.altitudeAccuracyM, 12, 35, 80);
+}
+
 function projectToSegment(point: RunPoint, segment: RouteSegment) {
   const p = toXY(point);
   const abX = segment.endXY.x - segment.startXY.x;
@@ -161,12 +173,13 @@ export function matchPointToRoute(
   config: ChallengeConfig,
   expectedSteps?: number | null
 ): RouteMatch {
-  const altitudeAvailable = point.altitudeM !== null && point.altitudeM > 350 && point.altitudeM < 750;
+  const altitudeTrust = altitudeReliability(point);
+  const altitudeAvailable = altitudeTrust > 0;
   const pointAltitudeM = altitudeAvailable ? point.altitudeM : null;
   const candidates = routeSegments.map((segment) => {
     const projected = projectToSegment(point, segment);
     const altitudeDeltaM = pointAltitudeM === null ? null : pointAltitudeM - projected.expectedAltitudeM;
-    const altitudePenalty = altitudeDeltaM === null ? 0 : Math.min(45, Math.abs(altitudeDeltaM) * 0.7);
+    const altitudePenalty = altitudeDeltaM === null ? 0 : Math.min(28, Math.abs(altitudeDeltaM) * 0.45 * altitudeTrust);
     const continuityPenalty =
       expectedSteps === null || expectedSteps === undefined
         ? 0
@@ -192,7 +205,7 @@ export function matchPointToRoute(
     best.altitudeDeltaM === null
       ? 0.66
       : scoreByRange(Math.abs(best.altitudeDeltaM), 14, 32, 60);
-  let confidence = clamp(accuracyScore * 0.42 + routeScore * 0.38 + altitudeScore * 0.2, 0, 1);
+  let confidence = clamp(accuracyScore * 0.46 + routeScore * 0.42 + altitudeScore * 0.12, 0, 1);
   const offRoute = best.projected.distanceToRouteM > Math.max(55, point.accuracyM + 25);
   if (offRoute) {
     confidence = Math.min(confidence, 0.35);
@@ -201,7 +214,11 @@ export function matchPointToRoute(
 
   if (point.accuracyM > config.gpsAccuracyReviewMaxM) flags.push("gps_accuracy_low");
   if (offRoute) flags.push("off_route");
-  if (best.altitudeDeltaM !== null && Math.abs(best.altitudeDeltaM) > 45) flags.push("altitude_mismatch");
+  if (best.altitudeDeltaM !== null && Math.abs(best.altitudeDeltaM) > 65 && altitudeTrust >= 0.65) {
+    flags.push("altitude_mismatch");
+  } else if (best.altitudeDeltaM !== null && Math.abs(best.altitudeDeltaM) > 65) {
+    flags.push("altitude_unreliable");
+  }
   if (confidence < minGoodConfidence) flags.push("low_confidence");
 
   return {
@@ -358,8 +375,9 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
 
     maxSteps = Math.max(maxSteps, filteredSteps);
 
-    if (match.altitudeDeltaM !== null) {
-      altitudeConsistency.push(Math.abs(match.altitudeDeltaM) <= 35);
+    const altitudeCanJudge = point.altitudeM !== null && (point.altitudeAccuracyM === null || point.altitudeAccuracyM <= 65);
+    if (match.altitudeDeltaM !== null && altitudeCanJudge) {
+      altitudeConsistency.push(Math.abs(match.altitudeDeltaM) <= 45);
     }
 
     const item: RoutePointTelemetry = {

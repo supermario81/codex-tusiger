@@ -60,6 +60,52 @@ export function validateRun(
     endPoint?.altitudeM !== undefined
       ? endPoint.altitudeM - startPoint.altitudeM
       : null;
+  const completionThresholdSteps = Math.max(config.totalSteps - 35, config.totalSteps * 0.96);
+  const routeCompletionStrong = tracking.maxSteps >= completionThresholdSteps && tracking.finalSteps >= config.totalSteps - 55;
+  const endZonePlausible = endDistanceToZone !== null && endDistanceToZone <= config.endRadiusM * 1.75;
+  const startZonePlausible = startDistanceToZone !== null && startDistanceToZone <= config.startRadiusM * 1.75;
+  const firstRouteLock = tracking.telemetry.find(
+    (point) => point.confidenceLevel !== "low" && !point.offRoute
+  );
+  const lastRouteLock = [...tracking.telemetry].reverse().find(
+    (point) => point.confidenceLevel !== "low" && !point.offRoute
+  );
+  const earlyRawGpsUnreliable = points.slice(0, 5).some(
+    (point) => point.accuracyM > config.gpsAccuracyReviewMaxM || (point.altitudeAccuracyM ?? 0) > 80
+  );
+  const lateRawGpsUnreliable = points.slice(-5).some(
+    (point) => point.accuracyM > config.gpsAccuracyReviewMaxM || (point.altitudeAccuracyM ?? 0) > 80
+  );
+  const startRecoveredByRoute =
+    routeCompletionStrong &&
+    earlyRawGpsUnreliable &&
+    firstRouteLock !== undefined &&
+    firstRouteLock.filteredSteps <= 150 &&
+    tracking.continuityScore >= 0.5 &&
+    tracking.routeAdherenceRatio >= 0.58;
+  const endRecoveredByRoute =
+    routeCompletionStrong &&
+    lateRawGpsUnreliable &&
+    lastRouteLock !== undefined &&
+    lastRouteLock.filteredSteps >= config.totalSteps - 65 &&
+    tracking.continuityScore >= 0.5 &&
+    tracking.routeAdherenceRatio >= 0.58;
+  const interpretedElevationValid =
+    tracking.interpretedElevationGainM >= config.elevationValidMinM &&
+    tracking.interpretedElevationGainM <= config.elevationValidMaxM;
+  const interpretedElevationReview =
+    tracking.interpretedElevationGainM >= config.elevationReviewMinM &&
+    tracking.interpretedElevationGainM <= config.elevationReviewMaxM;
+  const edgeAltitudeReliable =
+    (startPoint?.altitudeAccuracyM ?? Infinity) <= 35 &&
+    (endPoint?.altitudeAccuracyM ?? Infinity) <= 35;
+  const strongCompletionEvidence =
+    routeCompletionStrong &&
+    (endZonePlausible || endRecoveredByRoute) &&
+    (startZonePlausible || startRecoveredByRoute) &&
+    tracking.routeAdherenceRatio >= 0.62 &&
+    tracking.continuityScore >= 0.5 &&
+    tracking.averageConfidence >= 0.45;
 
   if (points.length < 3) {
     invalidReasons.push("Zu wenige GPS-Punkte für eine Prüfung.");
@@ -71,6 +117,8 @@ export function validateRun(
     invalidReasons.push("Startzone konnte nicht geprüft werden.");
   } else if (startDistanceToZone <= config.startRadiusM) {
     reasons.push("Startzone erfüllt.");
+  } else if (startRecoveredByRoute) {
+    reasons.push("Startzone über frühen Routenlock plausibel.");
   } else if (startDistanceToZone <= config.startRadiusM * 1.75) {
     reviewReasons.push("Startzone knapp außerhalb des Kernbereichs.");
   } else {
@@ -81,6 +129,8 @@ export function validateRun(
     invalidReasons.push("Zielzone konnte nicht geprüft werden.");
   } else if (endDistanceToZone <= config.endRadiusM) {
     reasons.push("Zielzone erfüllt.");
+  } else if (endRecoveredByRoute) {
+    reasons.push("Zielzone über letzten Routenlock plausibel.");
   } else if (endDistanceToZone <= config.endRadiusM * 1.75) {
     reviewReasons.push("Zielzone knapp außerhalb des Kernbereichs.");
   } else {
@@ -95,6 +145,8 @@ export function validateRun(
     reviewReasons.push("GPS-Genauigkeit braucht Prüfung.");
   } else if (gpsAccuracyAverage <= config.gpsAccuracyReviewMaxM * 1.6 && tracking.averageConfidence >= 0.55) {
     reviewReasons.push("GPS war im Wald ungenau, Route bleibt aber plausibel.");
+  } else if (strongCompletionEvidence && gpsAccuracyAverage <= config.gpsAccuracyReviewMaxM * 2.3) {
+    reviewReasons.push("GPS war zeitweise sehr ungenau, der vollständige Routenverlauf bleibt plausibel.");
   } else {
     invalidReasons.push("GPS-Genauigkeit zu ungenau.");
   }
@@ -108,7 +160,9 @@ export function validateRun(
   }
 
   if (elevationGain === null) {
-    if (tracking.interpretedElevationGainM >= config.elevationReviewMinM) {
+    if (interpretedElevationValid && strongCompletionEvidence) {
+      reasons.push("Höhenprofil über Routenmodell plausibel.");
+    } else if (interpretedElevationReview) {
       reviewReasons.push("GPS-Höhe fehlt, Höhenprofil wird über Route geschätzt.");
     } else {
       reviewReasons.push("Höhenprofil fehlt, Ergebnis braucht Prüfung.");
@@ -122,7 +176,15 @@ export function validateRun(
     elevationGain >= config.elevationReviewMinM &&
     elevationGain <= config.elevationReviewMaxM
   ) {
-    reviewReasons.push("Höhenprofil im Prüfbereich.");
+    if (interpretedElevationValid && strongCompletionEvidence && (startRecoveredByRoute || endRecoveredByRoute || !edgeAltitudeReliable)) {
+      reasons.push("GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
+    } else {
+      reviewReasons.push("Höhenprofil im Prüfbereich.");
+    }
+  } else if (interpretedElevationValid && strongCompletionEvidence && !edgeAltitudeReliable) {
+    reasons.push("GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
+  } else if (interpretedElevationReview && routeCompletionStrong && endZonePlausible && !edgeAltitudeReliable) {
+    reviewReasons.push("GPS-Höhe war unruhig, Routen-Höhenprofil bleibt plausibel.");
   } else {
     invalidReasons.push("Höhenprofil nicht plausibel.");
   }
@@ -137,8 +199,7 @@ export function validateRun(
     reasons.push("Route plausibel.");
   }
 
-  const completionThresholdSteps = Math.max(config.totalSteps - 35, config.totalSteps * 0.96);
-  if (tracking.maxSteps >= completionThresholdSteps && tracking.finalSteps >= config.totalSteps - 55) {
+  if (routeCompletionStrong) {
     reasons.push("Routenfortschritt bis zur Zielzone plausibel.");
   } else if (tracking.maxSteps >= config.totalSteps * 0.9 && endDistanceToZone !== null && endDistanceToZone <= config.endRadiusM * 1.75) {
     reviewReasons.push("Routenfortschritt fast vollständig, Ergebnis braucht Prüfung.");
@@ -150,6 +211,8 @@ export function validateRun(
     reasons.push("Bewegung bleibt im Treppenkorridor.");
   } else if (tracking.routeAdherenceRatio >= 0.62) {
     reviewReasons.push("Ein Teil der GPS-Punkte liegt außerhalb des Treppenkorridors.");
+  } else if (routeCompletionStrong && endZonePlausible && tracking.routeAdherenceRatio >= 0.52) {
+    reviewReasons.push("Viele GPS-Punkte waren seitlich ungenau, Abschluss und Route bleiben prüfbar.");
   } else {
     invalidReasons.push("Zu viele Punkte liegen außerhalb des Treppenkorridors.");
   }
@@ -158,6 +221,8 @@ export function validateRun(
     reasons.push("Fortschritt entlang der Route ausreichend kontinuierlich.");
   } else if (tracking.continuityScore >= 0.38) {
     reviewReasons.push("Route wurde nur teilweise kontinuierlich erfasst.");
+  } else if (routeCompletionStrong && endZonePlausible && tracking.continuityScore >= 0.3) {
+    reviewReasons.push("Routenabschnitte wurden lückenhaft erfasst, Zielabschluss bleibt prüfbar.");
   } else {
     invalidReasons.push("Route wurde nicht kontinuierlich genug erfasst.");
   }
@@ -175,6 +240,8 @@ export function validateRun(
       reasons.push("GPS-Höhe passt zum Routenprofil.");
     } else if (tracking.altitudeConsistencyRatio >= 0.45) {
       reviewReasons.push("GPS-Höhe weicht teilweise vom Routenprofil ab.");
+    } else if (interpretedElevationValid && strongCompletionEvidence && !edgeAltitudeReliable) {
+      reasons.push("GPS-Höhe war stark verrauscht, Routen-Höhenmodell ist plausibel.");
     } else {
       invalidReasons.push("GPS-Höhe passt nicht zum Routenprofil.");
     }

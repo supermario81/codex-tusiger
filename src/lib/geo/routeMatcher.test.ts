@@ -58,4 +58,22 @@ describe("analyzeRouteTrack", () => {
     expect(summary.finalSteps).toBe(0);
     expect(summary.confidenceLevel).toBe("low");
   });
+
+  it("suppresses erratic backward drift from a noisy GPS sample", () => {
+    const points = createSyntheticRunPoints(900);
+    const noisyPoints = points.map((point, index) =>
+      index === 25
+        ? { ...point, lat: routeWaypoints[5].lat, lng: routeWaypoints[5].lng, accuracyM: 48, altitudeAccuracyM: 80 }
+        : point
+    );
+    const summary = analyzeRouteTrack(noisyPoints, defaultChallengeConfig);
+    const filteredSteps = summary.telemetry.map((point) => point.filteredSteps);
+    const largestBackwardMove = filteredSteps.reduce((largest, steps, index) => {
+      const previous = filteredSteps[index - 1] ?? steps;
+      return Math.max(largest, previous - steps);
+    }, 0);
+
+    expect(summary.maxSteps).toBe(defaultChallengeConfig.totalSteps);
+    expect(largestBackwardMove).toBeLessThanOrEqual(20);
+  });
 });
