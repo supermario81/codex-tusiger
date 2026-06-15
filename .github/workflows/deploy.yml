@@ -2,7 +2,7 @@ name: Deploy Tusiger PWA
 
 on:
   push:
-    branches: [main]
+    branches: [feature/next-major-work]
   workflow_dispatch:
 
 permissions:
