@@ -612,6 +612,7 @@ form { display: grid; gap: 16px; }
 }
 .pre-run { padding-top: 64px; text-align: center; }
 .pre-run > p { font-size: 1.35rem; color: var(--forest); }
+.pre-run-hint { font-size: .92rem !important; color: rgba(52,78,65,.78) !important; margin: -6px 0 2px; }
 .check-list { overflow: hidden; }
 .check-list article {
   min-height: 74px;

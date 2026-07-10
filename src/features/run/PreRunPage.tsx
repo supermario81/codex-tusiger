@@ -1,5 +1,5 @@
 import { Check, Footprints, LocateFixed, MapPin, Mountain, Navigation, X } from "lucide-react";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
@@ -9,72 +9,148 @@ import { haversineDistanceMeters } from "../../lib/geo/geo";
 import type { RunPoint } from "../../lib/types";
 import { positionToRunPoint } from "./runUtils";
 
-type PermissionState = "idle" | "loading" | "ready" | "warning" | "error";
+type WatchState = "idle" | "watching" | "error";
+
+// iPhone Safari startet oft mit einem Wi-Fi-Fix (±50 m) und braucht 5–15 s
+// bis zum echten GPS-Fix (±5–10 m). Für die Entscheidung zählt deshalb der
+// genaueste Fix der letzten 10 Sekunden, nicht der erste oder der neueste.
+const bestFixWindowMs = 10_000;
+
+function pruneFixWindow(fixes: RunPoint[], next: RunPoint): RunPoint[] {
+  const newestAt = new Date(next.recordedAt).getTime();
+  return [
+    ...fixes.filter((fix) => newestAt - new Date(fix.recordedAt).getTime() <= bestFixWindowMs),
+    next
+  ];
+}
 
 export function PreRunPage() {
   const { config, profile } = useApp();
   const navigate = useNavigate();
-  const [state, setState] = useState<PermissionState>("idle");
-  const [point, setPoint] = useState<RunPoint | null>(null);
+  const [state, setState] = useState<WatchState>("idle");
+  const [fixes, setFixes] = useState<RunPoint[]>([]);
   const [message, setMessage] = useState("Standort noch nicht geprüft.");
+  const watchId = useRef<number | null>(null);
 
-  const distanceToStart = useMemo(() => {
-    if (!point) {
+  const bestFix = useMemo(() => {
+    if (fixes.length === 0) {
       return null;
     }
-    return haversineDistanceMeters(point, { lat: config.startLat, lng: config.startLng });
-  }, [config.startLat, config.startLng, point]);
+    return fixes.reduce((best, fix) => (fix.accuracyM < best.accuracyM ? fix : best), fixes[0]);
+  }, [fixes]);
 
+  const distanceToStart = useMemo(() => {
+    if (!bestFix) {
+      return null;
+    }
+    return haversineDistanceMeters(bestFix, { lat: config.startLat, lng: config.startLng });
+  }, [bestFix, config.startLat, config.startLng]);
+
+  // GPS-Unsicherheit darf die Startzone überlappen: effektive Distanz ist die
+  // Distanz abzüglich der Genauigkeit — wer laut GPS 40 m entfernt ist, aber
+  // ±30 m Unsicherheit hat, kann in der Zone stehen.
+  const effectiveDistance =
+    bestFix && distanceToStart !== null ? Math.max(0, distanceToStart - bestFix.accuracyM) : null;
+  const accuracyOk = Boolean(bestFix && bestFix.accuracyM <= config.gpsAccuracyReviewMaxM);
+  const stabilizing = Boolean(bestFix && bestFix.accuracyM > config.gpsAccuracyReviewMaxM);
   const canStart =
-    point !== null &&
-    distanceToStart !== null &&
-    distanceToStart <= config.startRadiusM &&
-    point.accuracyM <= config.gpsAccuracyValidMaxM;
+    accuracyOk && effectiveDistance !== null && effectiveDistance <= config.startRadiusM;
 
-  useEffect(() => {
-    return () => setState((current) => (current === "loading" ? "idle" : current));
-  }, []);
+  function stopLocationWatch() {
+    if (watchId.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+  }
+
+  useEffect(() => stopLocationWatch, []);
 
   if (!profile) {
     return <Navigate to="/login" replace />;
   }
 
-  function requestLocation() {
-    setState("loading");
-    setMessage("Standort wird angefragt...");
+  function startLocationWatch() {
     if (!navigator.geolocation) {
       setState("error");
       setMessage("Dieser Browser unterstützt keine Geolocation.");
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    stopLocationWatch();
+    setState("watching");
+    setMessage("GPS wird gestartet...");
+    watchId.current = navigator.geolocation.watchPosition(
       (position) => {
         const next = positionToRunPoint(position);
-        setPoint(next);
-        const distance = haversineDistanceMeters(next, { lat: config.startLat, lng: config.startLng });
-        setState(distance <= config.startRadiusM && next.accuracyM <= config.gpsAccuracyValidMaxM ? "ready" : "warning");
-        setMessage("Standort erfolgreich geprüft.");
+        setFixes((current) => pruneFixWindow(current, next));
+        setState("watching");
       },
       (error) => {
-        setState("error");
-        setMessage(error.message || "Standort wurde abgelehnt.");
+        if (error.code === error.PERMISSION_DENIED) {
+          setState("error");
+          setMessage("Standortzugriff wurde abgelehnt. Bitte in den Safari-Einstellungen erlauben.");
+          stopLocationWatch();
+          return;
+        }
+        // Timeout/Position unavailable: Watch läuft weiter, GPS braucht oft
+        // ein paar Sekunden bis zum ersten brauchbaren Fix.
+        setMessage("GPS-Signal wird gesucht...");
       },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 3_000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 }
     );
   }
 
   function startRun(needsReview: boolean) {
+    stopLocationWatch();
     localStorage.setItem("tusiger.forceReview", String(needsReview));
     navigate("/run");
   }
 
+  // Jede Zeile prüft genau eine Aussage und zeigt den gemessenen Wert dazu:
+  // Standort = Fix vorhanden, GPS = Genauigkeit ausreichend, Höhe = optionaler
+  // Messwert, Bewegung = Aufzeichnung aktiv, Startzone = effektive Distanz.
   const rows: Array<{ icon: typeof MapPin; label: string; text: ReactNode; ok: boolean }> = [
-    { icon: MapPin, label: "Standort", text: point ? "Olten, Schweiz" : message, ok: state === "ready" },
-    { icon: Navigation, label: "GPS", text: point ? `± ${Math.round(point.accuracyM)} m Genauigkeit` : "Noch nicht geprüft", ok: Boolean(point && point.accuracyM <= config.gpsAccuracyValidMaxM) },
-    { icon: Mountain, label: "Höhe", text: point?.altitudeM ? `${Math.round(point.altitudeM)} m ü. M.` : "Höhe optional", ok: true },
-    { icon: Footprints, label: "Bewegung", text: <>Bereit für GPS-<br />Aufzeichnung</>, ok: true },
-    { icon: LocateFixed, label: "Startzone", text: distanceToStart === null ? "Unten am Start prüfen" : `${Math.round(distanceToStart)} m entfernt`, ok: canStart }
+    {
+      icon: MapPin,
+      label: "Standort",
+      text: bestFix ? `Position erfasst (${bestFix.lat.toFixed(5)}, ${bestFix.lng.toFixed(5)})` : message,
+      ok: Boolean(bestFix)
+    },
+    {
+      icon: Navigation,
+      label: "GPS",
+      text: bestFix
+        ? accuracyOk
+          ? `± ${Math.round(bestFix.accuracyM)} m Genauigkeit`
+          : `GPS stabilisiert sich... ± ${Math.round(bestFix.accuracyM)} m`
+        : state === "watching"
+          ? "GPS stabilisiert sich..."
+          : "Noch nicht geprüft",
+      ok: accuracyOk
+    },
+    {
+      icon: Mountain,
+      label: "Höhe",
+      text: bestFix?.altitudeM != null ? `${Math.round(bestFix.altitudeM)} m ü. M.` : "Keine Höhendaten (optional)",
+      ok: true
+    },
+    {
+      icon: Footprints,
+      label: "Bewegung",
+      text: state === "watching" ? <>Bereit für GPS-<br />Aufzeichnung</> : "Startet mit dem GPS-Check",
+      ok: state === "watching"
+    },
+    {
+      icon: LocateFixed,
+      label: "Startzone",
+      text:
+        distanceToStart === null
+          ? "Unten am Start prüfen"
+          : canStart
+            ? `In der Startzone (${Math.round(distanceToStart)} m vom Referenzpunkt)`
+            : `${Math.round(distanceToStart)} m entfernt (± ${Math.round(bestFix?.accuracyM ?? 0)} m)`,
+      ok: canStart
+    }
   ];
 
   return (
@@ -101,13 +177,19 @@ export function PreRunPage() {
             <strong>Start unten</strong>
             <span>Zone<br />{canStart ? "aktiv" : "noch nicht aktiv"}</span>
           </div>
-          <p>GPS: {point ? `± ${Math.round(point.accuracyM)} m` : "unbekannt"}</p>
+          <p>
+            GPS: {bestFix ? `± ${Math.round(bestFix.accuracyM)} m` : "unbekannt"}
+            {stabilizing ? " — stabilisiert sich..." : ""}
+          </p>
         </GlassPanel>
-        {!point ? (
-          <Button icon={<LocateFixed />} onClick={requestLocation}>Standort prüfen</Button>
+        {state !== "watching" ? (
+          <Button icon={<LocateFixed />} onClick={startLocationWatch}>Standort prüfen</Button>
         ) : (
           <Button disabled={!canStart} icon={<Footprints />} onClick={() => startRun(false)}>Starten</Button>
         )}
+        {state === "watching" && stabilizing ? (
+          <p className="pre-run-hint">GPS stabilisiert sich... ± {Math.round(bestFix?.accuracyM ?? 0)} m — ein paar Sekunden warten hilft.</p>
+        ) : null}
         <button className="text-link" type="button" onClick={() => startRun(true)}>Trotzdem starten</button>
       </section>
     </PageShell>
