@@ -6,6 +6,7 @@ import { PageShell } from "../../components/layout/PageShell";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
+import { formatAppVersionLine } from "../../lib/appVersion";
 import { formatDuration } from "../../lib/geo/geo";
 
 export function ProfilePage() {
@@ -126,6 +127,7 @@ export function ProfilePage() {
         <Link className="action-row" to="/history"><History /> {t.story}</Link>
         <Link className="action-row" to="/settings"><Settings /> {t.settings}</Link>
         <Button variant="secondary" onClick={logout} icon={<LogOut />}>Logout</Button>
+        <p className="app-version">{formatAppVersionLine(language)}</p>
       </section>
     </PageShell>
   );

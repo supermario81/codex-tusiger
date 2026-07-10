@@ -6,6 +6,7 @@ import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { ProgressBar } from "../../components/ui/ProgressBar";
+import { formatAppVersionLine } from "../../lib/appVersion";
 
 export function HomePage() {
   const { config, language, profile, runs } = useApp();
@@ -57,6 +58,7 @@ export function HomePage() {
         <Link className="action-row" to="/history">
           <Heart aria-hidden /> {t.history} <ChevronRight aria-hidden />
         </Link>
+        <p className="app-version">{formatAppVersionLine(language)}</p>
       </section>
     </PageShell>
   );
