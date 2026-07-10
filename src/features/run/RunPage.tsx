@@ -210,7 +210,10 @@ export function RunPage() {
     // letzten guten Punkte. Beide gehen in Validierung und Laufbericht ein.
     const startReference = stableStart ?? stableEdgePoint(sourcePoints, "start");
     const endReference = stableEdgePoint(sourcePoints, "end");
-    const validation = validateRun({ startedAt, endedAt: finishedAt }, sourcePoints, config);
+    const validation = validateRun({ startedAt, endedAt: finishedAt }, sourcePoints, config, {
+      start: startReference,
+      end: endReference
+    });
     const forceReview = localStorage.getItem("tusiger.forceReview") === "true";
     const status = forceReview && validation.status === "valid" ? "needs_review" : validation.status;
     const run: RunRecord = {
@@ -222,6 +225,7 @@ export function RunPage() {
       status,
       validationScore: validation.score,
       validationReasons: validation.reasons,
+      validationChecks: validation.checks,
       startLat: startReference?.lat ?? sourcePoints[0]?.lat ?? null,
       startLng: startReference?.lng ?? sourcePoints[0]?.lng ?? null,
       endLat: endReference?.lat ?? sourcePoints.at(-1)?.lat ?? null,

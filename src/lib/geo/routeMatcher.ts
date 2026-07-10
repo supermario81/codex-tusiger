@@ -268,6 +268,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       projectedDistanceMeters: 0,
       routeDistanceMeters: getRouteLengthMeters(),
       altitudeGainM: null,
+      cumulativeAscentM: null,
       interpretedElevationGainM: 0,
       averageConfidence: 0,
       confidenceLevel: "low",
@@ -296,6 +297,11 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   let largeGapCount = 0;
   let longestGapSeconds = 0;
   let projectedDistanceMeters = 0;
+  // Kumulativer gefilterter Anstieg: nur Höhengewinne oberhalb einer
+  // Rausch-Schwelle von 1,5 m zählen (Hysterese gegen GPS-Jitter).
+  const ascentNoiseThresholdM = 1.5;
+  let cumulativeAscentM = 0;
+  let ascentAnchorAltitudeM: number | null = null;
   const matchedBands = new Set<number>();
   const altitudeConsistency: boolean[] = [];
   const telemetry: RoutePointTelemetry[] = [];
@@ -380,6 +386,20 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       altitudeConsistency.push(Math.abs(match.altitudeDeltaM) <= 45);
     }
 
+    if (point.altitudeM !== null && altitudeCanJudge) {
+      if (ascentAnchorAltitudeM === null) {
+        ascentAnchorAltitudeM = point.altitudeM;
+      } else {
+        const altitudeDelta = point.altitudeM - ascentAnchorAltitudeM;
+        if (altitudeDelta >= ascentNoiseThresholdM) {
+          cumulativeAscentM += altitudeDelta;
+          ascentAnchorAltitudeM = point.altitudeM;
+        } else if (altitudeDelta <= -ascentNoiseThresholdM) {
+          ascentAnchorAltitudeM = point.altitudeM;
+        }
+      }
+    }
+
     const item: RoutePointTelemetry = {
       recordedAt: point.recordedAt,
       rawLat: point.lat,
@@ -450,6 +470,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     projectedDistanceMeters,
     routeDistanceMeters: getRouteLengthMeters(),
     altitudeGainM,
+    cumulativeAscentM: ascentAnchorAltitudeM === null ? null : Math.round(cumulativeAscentM * 10) / 10,
     interpretedElevationGainM,
     averageConfidence,
     confidenceLevel: confidenceLevel(averageConfidence),

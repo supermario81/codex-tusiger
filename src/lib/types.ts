@@ -78,6 +78,7 @@ export type RouteTrackSummary = {
   projectedDistanceMeters: number;
   routeDistanceMeters: number;
   altitudeGainM: number | null;
+  cumulativeAscentM: number | null;
   interpretedElevationGainM: number;
   averageConfidence: number;
   confidenceLevel: TrackingConfidenceLevel;
@@ -93,6 +94,16 @@ export type RouteTrackSummary = {
   telemetry: RoutePointTelemetry[];
 };
 
+export type ValidationCheckLevel = "pass" | "review" | "fail";
+
+// Eine geprüfte Regel mit Messwert für Laufbericht und Diagnose-Export.
+export type ValidationCheck = {
+  rule: string;
+  label: string;
+  measured: string;
+  level: ValidationCheckLevel;
+};
+
 export type RunRecord = {
   id: string;
   userId: string;
@@ -102,6 +113,7 @@ export type RunRecord = {
   status: ValidationStatus;
   validationScore: number;
   validationReasons: string[];
+  validationChecks?: ValidationCheck[];
   startLat: number | null;
   startLng: number | null;
   endLat: number | null;
@@ -182,9 +194,11 @@ export type ValidationResult = {
   status: Exclude<ValidationStatus, "draft">;
   score: number;
   reasons: string[];
+  checks: ValidationCheck[];
   metrics: {
     durationSeconds: number;
     elevationGain: number | null;
+    cumulativeAscentM: number | null;
     gpsAccuracyAverage: number | null;
     gpsAccuracyMin: number | null;
     gpsAccuracyMax: number | null;

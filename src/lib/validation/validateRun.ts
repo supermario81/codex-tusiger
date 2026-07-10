@@ -1,6 +1,20 @@
 import { calculateRouteDistance, haversineDistanceMeters, stableEdgePoint } from "../geo/geo";
 import { analyzeRouteTrack } from "../geo/routeMatcher";
-import type { ChallengeConfig, RunPoint, ValidationResult } from "../types";
+import type {
+  ChallengeConfig,
+  RunPoint,
+  ValidationCheck,
+  ValidationCheckLevel,
+  ValidationResult
+} from "../types";
+
+// Optionale, bereits beim Lauf eingefrorene Referenzpunkte. Ohne sie werden
+// die Referenzen aus der vollen Aufzeichnung berechnet (Median der ersten/
+// letzten 5 guten Punkte) — niemals aus einem Puffer-Ausschnitt.
+export type ValidationReferences = {
+  start?: RunPoint | null;
+  end?: RunPoint | null;
+};
 
 function average(values: number[]): number | null {
   if (values.length === 0) {
@@ -32,16 +46,39 @@ function detectImpossibleJumps(points: RunPoint[]): number {
 export function validateRun(
   run: { startedAt: string; endedAt: string | null },
   points: RunPoint[],
-  config: ChallengeConfig
+  config: ChallengeConfig,
+  references: ValidationReferences = {}
 ): ValidationResult {
   const reasons: string[] = [];
   const invalidReasons: string[] = [];
   const reviewReasons: string[] = [];
+  const checks: ValidationCheck[] = [];
+
+  function record(
+    rule: string,
+    label: string,
+    measured: string,
+    level: ValidationCheckLevel,
+    reason?: string
+  ) {
+    checks.push({ rule, label, measured, level });
+    if (!reason) {
+      return;
+    }
+    if (level === "pass") {
+      reasons.push(reason);
+    } else if (level === "review") {
+      reviewReasons.push(reason);
+    } else {
+      invalidReasons.push(reason);
+    }
+  }
+
   const startedAt = new Date(run.startedAt).getTime();
   const endedAt = run.endedAt ? new Date(run.endedAt).getTime() : Date.now();
   const durationSeconds = Math.max(0, (endedAt - startedAt) / 1000);
-  const startPoint = stableEdgePoint(points, "start");
-  const endPoint = stableEdgePoint(points, "end");
+  const startPoint = references.start ?? stableEdgePoint(points, "start");
+  const endPoint = references.end ?? stableEdgePoint(points, "end");
   const tracking = analyzeRouteTrack(points, config);
   const accuracyValues = points.map((point) => point.accuracyM).filter(Number.isFinite);
   const gpsAccuracyAverage = average(accuracyValues);
@@ -60,6 +97,7 @@ export function validateRun(
     endPoint?.altitudeM !== undefined
       ? endPoint.altitudeM - startPoint.altitudeM
       : null;
+  const cumulativeAscentM = tracking.cumulativeAscentM;
   const completionThresholdSteps = Math.max(config.totalSteps - 35, config.totalSteps * 0.96);
   const routeCompletionStrong = tracking.maxSteps >= completionThresholdSteps && tracking.finalSteps >= config.totalSteps - 55;
   const endZonePlausible = endDistanceToZone !== null && endDistanceToZone <= config.endRadiusM * 1.75;
@@ -107,148 +145,183 @@ export function validateRun(
     tracking.continuityScore >= 0.5 &&
     tracking.averageConfidence >= 0.45;
 
+  const pointCountMeasured = `${points.length} GPS-Punkte aufgezeichnet`;
   if (points.length < 3) {
-    invalidReasons.push("Zu wenige GPS-Punkte für eine Prüfung.");
+    record("pointCount", "GPS-Punkte", pointCountMeasured, "fail", "Zu wenige GPS-Punkte für eine Prüfung.");
   } else if (points.length < 8) {
-    reviewReasons.push("Wenige GPS-Punkte, Ergebnis braucht Prüfung.");
+    record("pointCount", "GPS-Punkte", pointCountMeasured, "review", "Wenige GPS-Punkte, Ergebnis braucht Prüfung.");
+  } else {
+    record("pointCount", "GPS-Punkte", pointCountMeasured, "pass");
   }
 
+  const startZoneMeasured =
+    startDistanceToZone === null
+      ? "keine stabile Start-Referenz"
+      : `${Math.round(startDistanceToZone)} m vom Referenzpunkt (Radius ${Math.round(config.startRadiusM)} m)`;
   if (startDistanceToZone === null) {
-    invalidReasons.push("Startzone konnte nicht geprüft werden.");
+    record("startZone", "Startzone", startZoneMeasured, "fail", "Startzone konnte nicht geprüft werden.");
   } else if (startDistanceToZone <= config.startRadiusM) {
-    reasons.push("Startzone erfüllt.");
+    record("startZone", "Startzone", startZoneMeasured, "pass", "Startzone erfüllt.");
   } else if (startRecoveredByRoute) {
-    reasons.push("Startzone über frühen Routenlock plausibel.");
+    record("startZone", "Startzone", startZoneMeasured, "pass", "Startzone über frühen Routenlock plausibel.");
   } else if (startDistanceToZone <= config.startRadiusM * 1.75) {
-    reviewReasons.push("Startzone knapp außerhalb des Kernbereichs.");
+    record("startZone", "Startzone", startZoneMeasured, "review", "Startzone knapp außerhalb des Kernbereichs.");
   } else {
-    invalidReasons.push("Startzone nicht erfüllt.");
+    record("startZone", "Startzone", startZoneMeasured, "fail", "Startzone nicht erfüllt.");
   }
 
+  const endZoneMeasured =
+    endDistanceToZone === null
+      ? "keine stabile Ziel-Referenz"
+      : `${Math.round(endDistanceToZone)} m vom Referenzpunkt (Radius ${Math.round(config.endRadiusM)} m)`;
   if (endDistanceToZone === null) {
-    invalidReasons.push("Zielzone konnte nicht geprüft werden.");
+    record("endZone", "Zielzone", endZoneMeasured, "fail", "Zielzone konnte nicht geprüft werden.");
   } else if (endDistanceToZone <= config.endRadiusM) {
-    reasons.push("Zielzone erfüllt.");
+    record("endZone", "Zielzone", endZoneMeasured, "pass", "Zielzone erfüllt.");
   } else if (endRecoveredByRoute) {
-    reasons.push("Zielzone über letzten Routenlock plausibel.");
+    record("endZone", "Zielzone", endZoneMeasured, "pass", "Zielzone über letzten Routenlock plausibel.");
   } else if (endDistanceToZone <= config.endRadiusM * 1.75) {
-    reviewReasons.push("Zielzone knapp außerhalb des Kernbereichs.");
+    record("endZone", "Zielzone", endZoneMeasured, "review", "Zielzone knapp außerhalb des Kernbereichs.");
   } else {
-    invalidReasons.push("Zielzone nicht erfüllt.");
+    record("endZone", "Zielzone", endZoneMeasured, "fail", "Zielzone nicht erfüllt.");
   }
 
+  const accuracyMeasured =
+    gpsAccuracyAverage === null
+      ? "keine Genauigkeitswerte"
+      : `Ø ±${Math.round(gpsAccuracyAverage)} m (min ±${Math.round(gpsAccuracyMin ?? 0)} m, max ±${Math.round(gpsAccuracyMax ?? 0)} m, gültig ≤ ${Math.round(config.gpsAccuracyValidMaxM)} m)`;
   if (gpsAccuracyAverage === null) {
-    reviewReasons.push("GPS-Genauigkeit fehlt.");
+    record("gpsAccuracy", "GPS-Genauigkeit", accuracyMeasured, "review", "GPS-Genauigkeit fehlt.");
   } else if (gpsAccuracyAverage <= config.gpsAccuracyValidMaxM) {
-    reasons.push("GPS-Genauigkeit ausreichend.");
+    record("gpsAccuracy", "GPS-Genauigkeit", accuracyMeasured, "pass", "GPS-Genauigkeit ausreichend.");
   } else if (gpsAccuracyAverage <= config.gpsAccuracyReviewMaxM) {
-    reviewReasons.push("GPS-Genauigkeit braucht Prüfung.");
+    record("gpsAccuracy", "GPS-Genauigkeit", accuracyMeasured, "review", "GPS-Genauigkeit braucht Prüfung.");
   } else if (gpsAccuracyAverage <= config.gpsAccuracyReviewMaxM * 1.6 && tracking.averageConfidence >= 0.55) {
-    reviewReasons.push("GPS war im Wald ungenau, Route bleibt aber plausibel.");
+    record("gpsAccuracy", "GPS-Genauigkeit", accuracyMeasured, "review", "GPS war im Wald ungenau, Route bleibt aber plausibel.");
   } else if (strongCompletionEvidence && gpsAccuracyAverage <= config.gpsAccuracyReviewMaxM * 2.3) {
-    reviewReasons.push("GPS war zeitweise sehr ungenau, der vollständige Routenverlauf bleibt plausibel.");
+    record("gpsAccuracy", "GPS-Genauigkeit", accuracyMeasured, "review", "GPS war zeitweise sehr ungenau, der vollständige Routenverlauf bleibt plausibel.");
   } else {
-    invalidReasons.push("GPS-Genauigkeit zu ungenau.");
+    record("gpsAccuracy", "GPS-Genauigkeit", accuracyMeasured, "fail", "GPS-Genauigkeit zu ungenau.");
   }
 
+  const durationMeasured = `${Math.round(durationSeconds)} s (erlaubt ${config.minDurationSeconds}–${config.maxDurationSeconds} s)`;
   if (durationSeconds < config.minDurationSeconds) {
-    invalidReasons.push("Zeit ist zu kurz für die Strecke.");
+    record("duration", "Zeit", durationMeasured, "fail", "Zeit ist zu kurz für die Strecke.");
   } else if (durationSeconds > config.maxDurationSeconds) {
-    invalidReasons.push("Zeit liegt außerhalb des erlaubten Bereichs.");
+    record("duration", "Zeit", durationMeasured, "fail", "Zeit liegt außerhalb des erlaubten Bereichs.");
   } else {
-    reasons.push("Zeit plausibel.");
+    record("duration", "Zeit", durationMeasured, "pass", "Zeit plausibel.");
   }
 
+  const ascentInfo = cumulativeAscentM === null ? "" : `, kumulativ ${Math.round(cumulativeAscentM)} m`;
+  const elevationMeasured =
+    elevationGain === null
+      ? `keine verwertbaren Höhendaten an Start/Ziel${ascentInfo} (Routenmodell ${Math.round(tracking.interpretedElevationGainM)} m)`
+      : `${Math.round(elevationGain)} m Anstieg Start→Ziel${ascentInfo} (gültig ${Math.round(config.elevationValidMinM)}–${Math.round(config.elevationValidMaxM)} m)`;
   if (elevationGain === null) {
     if (interpretedElevationValid && strongCompletionEvidence) {
-      reasons.push("Höhenprofil über Routenmodell plausibel.");
+      record("elevation", "Höhenmeter", elevationMeasured, "pass", "Höhenprofil über Routenmodell plausibel.");
     } else if (interpretedElevationReview) {
-      reviewReasons.push("GPS-Höhe fehlt, Höhenprofil wird über Route geschätzt.");
+      record("elevation", "Höhenmeter", elevationMeasured, "review", "GPS-Höhe fehlt, Höhenprofil wird über Route geschätzt.");
     } else {
-      reviewReasons.push("Höhenprofil fehlt, Ergebnis braucht Prüfung.");
+      record("elevation", "Höhenmeter", elevationMeasured, "review", "Höhenprofil fehlt, Ergebnis braucht Prüfung.");
     }
   } else if (
     elevationGain >= config.elevationValidMinM &&
     elevationGain <= config.elevationValidMaxM
   ) {
-    reasons.push("Höhenprofil plausibel.");
+    record("elevation", "Höhenmeter", elevationMeasured, "pass", "Höhenprofil plausibel.");
   } else if (
     elevationGain >= config.elevationReviewMinM &&
     elevationGain <= config.elevationReviewMaxM
   ) {
     if (interpretedElevationValid && strongCompletionEvidence && (startRecoveredByRoute || endRecoveredByRoute || !edgeAltitudeReliable)) {
-      reasons.push("GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
+      record("elevation", "Höhenmeter", elevationMeasured, "pass", "GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
     } else {
-      reviewReasons.push("Höhenprofil im Prüfbereich.");
+      record("elevation", "Höhenmeter", elevationMeasured, "review", "Höhenprofil im Prüfbereich.");
     }
   } else if (interpretedElevationValid && strongCompletionEvidence && !edgeAltitudeReliable) {
-    reasons.push("GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
+    record("elevation", "Höhenmeter", elevationMeasured, "pass", "GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
   } else if (interpretedElevationReview && routeCompletionStrong && endZonePlausible && !edgeAltitudeReliable) {
-    reviewReasons.push("GPS-Höhe war unruhig, Routen-Höhenprofil bleibt plausibel.");
+    record("elevation", "Höhenmeter", elevationMeasured, "review", "GPS-Höhe war unruhig, Routen-Höhenprofil bleibt plausibel.");
   } else {
-    invalidReasons.push("Höhenprofil nicht plausibel.");
+    record("elevation", "Höhenmeter", elevationMeasured, "fail", "Höhenprofil nicht plausibel.");
   }
 
   const impossibleJumps = detectImpossibleJumps(points);
   const totalImpossibleJumps = impossibleJumps + tracking.impossibleJumpCount;
+  const jumpsMeasured = `${totalImpossibleJumps} unrealistische GPS-Sprünge`;
   if (totalImpossibleJumps >= 3) {
-    invalidReasons.push("Mehrere unrealistische GPS-Sprünge erkannt.");
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "fail", "Mehrere unrealistische GPS-Sprünge erkannt.");
   } else if (totalImpossibleJumps > 0) {
-    reviewReasons.push("Einzelne GPS-Sprünge erkannt.");
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "review", "Einzelne GPS-Sprünge erkannt.");
   } else if (points.length > 1 && tracking.routeAdherenceRatio >= 0.75) {
-    reasons.push("Route plausibel.");
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "Route plausibel.");
+  } else {
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass");
   }
 
+  const progressMeasured = `${tracking.maxSteps} von ${config.totalSteps} Stufen erreicht`;
   if (routeCompletionStrong) {
-    reasons.push("Routenfortschritt bis zur Zielzone plausibel.");
+    record("routeProgress", "Routenfortschritt", progressMeasured, "pass", "Routenfortschritt bis zur Zielzone plausibel.");
   } else if (tracking.maxSteps >= config.totalSteps * 0.9 && endDistanceToZone !== null && endDistanceToZone <= config.endRadiusM * 1.75) {
-    reviewReasons.push("Routenfortschritt fast vollständig, Ergebnis braucht Prüfung.");
+    record("routeProgress", "Routenfortschritt", progressMeasured, "review", "Routenfortschritt fast vollständig, Ergebnis braucht Prüfung.");
   } else {
-    invalidReasons.push("Routenfortschritt erreicht die 1150 Stufen nicht plausibel.");
+    record("routeProgress", "Routenfortschritt", progressMeasured, "fail", "Routenfortschritt erreicht die 1150 Stufen nicht plausibel.");
   }
 
+  const adherenceMeasured = `${Math.round(tracking.routeAdherenceRatio * 100)} % der Punkte im Treppenkorridor`;
   if (tracking.routeAdherenceRatio >= 0.82) {
-    reasons.push("Bewegung bleibt im Treppenkorridor.");
+    record("adherence", "Treppenkorridor", adherenceMeasured, "pass", "Bewegung bleibt im Treppenkorridor.");
   } else if (tracking.routeAdherenceRatio >= 0.62) {
-    reviewReasons.push("Ein Teil der GPS-Punkte liegt außerhalb des Treppenkorridors.");
+    record("adherence", "Treppenkorridor", adherenceMeasured, "review", "Ein Teil der GPS-Punkte liegt außerhalb des Treppenkorridors.");
   } else if (routeCompletionStrong && endZonePlausible && tracking.routeAdherenceRatio >= 0.52) {
-    reviewReasons.push("Viele GPS-Punkte waren seitlich ungenau, Abschluss und Route bleiben prüfbar.");
+    record("adherence", "Treppenkorridor", adherenceMeasured, "review", "Viele GPS-Punkte waren seitlich ungenau, Abschluss und Route bleiben prüfbar.");
   } else {
-    invalidReasons.push("Zu viele Punkte liegen außerhalb des Treppenkorridors.");
+    record("adherence", "Treppenkorridor", adherenceMeasured, "fail", "Zu viele Punkte liegen außerhalb des Treppenkorridors.");
   }
 
+  const continuityMeasured = `${Math.round(tracking.continuityScore * 100)} % der Streckenabschnitte erfasst`;
   if (tracking.continuityScore >= 0.58) {
-    reasons.push("Fortschritt entlang der Route ausreichend kontinuierlich.");
+    record("continuity", "Kontinuität", continuityMeasured, "pass", "Fortschritt entlang der Route ausreichend kontinuierlich.");
   } else if (tracking.continuityScore >= 0.38) {
-    reviewReasons.push("Route wurde nur teilweise kontinuierlich erfasst.");
+    record("continuity", "Kontinuität", continuityMeasured, "review", "Route wurde nur teilweise kontinuierlich erfasst.");
   } else if (routeCompletionStrong && endZonePlausible && tracking.continuityScore >= 0.3) {
-    reviewReasons.push("Routenabschnitte wurden lückenhaft erfasst, Zielabschluss bleibt prüfbar.");
+    record("continuity", "Kontinuität", continuityMeasured, "review", "Routenabschnitte wurden lückenhaft erfasst, Zielabschluss bleibt prüfbar.");
   } else {
-    invalidReasons.push("Route wurde nicht kontinuierlich genug erfasst.");
+    record("continuity", "Kontinuität", continuityMeasured, "fail", "Route wurde nicht kontinuierlich genug erfasst.");
   }
 
+  const confidenceMeasured = `${Math.round(tracking.averageConfidence * 100)} % mittlere Signalqualität`;
   if (tracking.averageConfidence >= 0.68) {
-    reasons.push("Signalqualität hoch.");
+    record("confidence", "Signalqualität", confidenceMeasured, "pass", "Signalqualität hoch.");
   } else if (tracking.averageConfidence >= 0.45) {
-    reviewReasons.push("Signalqualität reduziert, aber auswertbar.");
+    record("confidence", "Signalqualität", confidenceMeasured, "review", "Signalqualität reduziert, aber auswertbar.");
   } else {
-    invalidReasons.push("Signalqualität zu niedrig.");
+    record("confidence", "Signalqualität", confidenceMeasured, "fail", "Signalqualität zu niedrig.");
   }
 
   if (tracking.altitudeConsistencyRatio !== null) {
+    const altConsistencyMeasured = `${Math.round(tracking.altitudeConsistencyRatio * 100)} % der Höhenwerte passen zum Routenprofil`;
     if (tracking.altitudeConsistencyRatio >= 0.72) {
-      reasons.push("GPS-Höhe passt zum Routenprofil.");
+      record("altitudeConsistency", "Höhenprofil-Konsistenz", altConsistencyMeasured, "pass", "GPS-Höhe passt zum Routenprofil.");
     } else if (tracking.altitudeConsistencyRatio >= 0.45) {
-      reviewReasons.push("GPS-Höhe weicht teilweise vom Routenprofil ab.");
+      record("altitudeConsistency", "Höhenprofil-Konsistenz", altConsistencyMeasured, "review", "GPS-Höhe weicht teilweise vom Routenprofil ab.");
     } else if (interpretedElevationValid && strongCompletionEvidence && !edgeAltitudeReliable) {
-      reasons.push("GPS-Höhe war stark verrauscht, Routen-Höhenmodell ist plausibel.");
+      record("altitudeConsistency", "Höhenprofil-Konsistenz", altConsistencyMeasured, "pass", "GPS-Höhe war stark verrauscht, Routen-Höhenmodell ist plausibel.");
     } else {
-      invalidReasons.push("GPS-Höhe passt nicht zum Routenprofil.");
+      record("altitudeConsistency", "Höhenprofil-Konsistenz", altConsistencyMeasured, "fail", "GPS-Höhe passt nicht zum Routenprofil.");
     }
   }
 
   if (tracking.inferredSteps > 0) {
-    reviewReasons.push(`${tracking.inferredSteps} Stufen wurden bei schwachem GPS konservativ geschätzt.`);
+    record(
+      "inferredSteps",
+      "Geschätzte Stufen",
+      `${tracking.inferredSteps} Stufen bei schwachem GPS konservativ geschätzt`,
+      "review",
+      `${tracking.inferredSteps} Stufen wurden bei schwachem GPS konservativ geschätzt.`
+    );
   }
 
   const estimatedSteps = Math.round(Math.max(tracking.finalSteps, tracking.maxSteps >= completionThresholdSteps ? tracking.maxSteps : tracking.finalSteps));
@@ -262,9 +335,11 @@ export function validateRun(
     status,
     score,
     reasons: [...reasons, ...reviewReasons, ...invalidReasons],
+    checks,
     metrics: {
       durationSeconds,
       elevationGain,
+      cumulativeAscentM,
       gpsAccuracyAverage,
       gpsAccuracyMin,
       gpsAccuracyMax,
