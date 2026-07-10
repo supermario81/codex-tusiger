@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultChallengeConfig } from "../../data/challenge";
-import { createSyntheticRunPoints } from "../../features/run/runUtils";
+import { createCalibrationRunPoints, createSyntheticRunPoints } from "../../features/run/runUtils";
+import { computeStableStartReference, stableEdgePoint } from "../geo/geo";
 import type { RunPoint } from "../types";
 import { validateRun } from "./validateRun";
 
@@ -15,6 +16,46 @@ describe("validateRun", () => {
     const result = runFor(createSyntheticRunPoints());
     expect(result.status).toBe("valid");
     expect(result.metrics.elevationGain).toBeGreaterThan(205);
+  });
+
+  it("validates a realistic 1-point-per-second full run as valid with ~234 m gain", () => {
+    const points = createCalibrationRunPoints(1002);
+    const result = runFor(points, 1002);
+
+    expect(result.status).toBe("valid");
+    expect(result.metrics.pointCount).toBe(1002);
+    expect(result.metrics.elevationGain).toBeGreaterThan(225);
+    expect(result.metrics.elevationGain).toBeLessThan(245);
+    expect(result.metrics.cumulativeAscentM).toBeGreaterThan(200);
+    expect(result.metrics.cumulativeAscentM).toBeLessThan(280);
+    expect(result.metrics.estimatedSteps).toBe(defaultChallengeConfig.totalSteps);
+    expect(result.checks.filter((check) => check.level === "fail")).toHaveLength(0);
+    expect(result.checks.map((check) => check.rule)).toEqual(
+      expect.arrayContaining(["pointCount", "startZone", "endZone", "gpsAccuracy", "duration", "elevation", "routeProgress"])
+    );
+  });
+
+  it("accepts frozen stable references from the run state", () => {
+    const points = createCalibrationRunPoints(1002);
+    const startedAt = new Date("2026-05-16T08:00:00Z").toISOString();
+    const endedAt = new Date(new Date(startedAt).getTime() + 1002 * 1000).toISOString();
+    const result = validateRun({ startedAt, endedAt }, points, defaultChallengeConfig, {
+      start: computeStableStartReference(points),
+      end: stableEdgePoint(points, "end")
+    });
+
+    expect(result.status).toBe("valid");
+    expect(result.metrics.startDistanceToZone).not.toBeNull();
+    expect(result.metrics.startDistanceToZone!).toBeLessThanOrEqual(defaultChallengeConfig.startRadiusM);
+    expect(result.metrics.endDistanceToZone!).toBeLessThanOrEqual(defaultChallengeConfig.endRadiusM);
+  });
+
+  it("shows measured values with pass/fail per rule in the checks", () => {
+    const result = runFor(createCalibrationRunPoints(1002), 1002);
+    const startCheck = result.checks.find((check) => check.rule === "startZone");
+
+    expect(startCheck?.level).toBe("pass");
+    expect(startCheck?.measured).toMatch(/m vom Referenzpunkt/);
   });
 
   it("invalidates a wrong start zone", () => {
