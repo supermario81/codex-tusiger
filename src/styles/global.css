@@ -821,6 +821,9 @@ form { display: grid; gap: 16px; }
 .success-medal.fail {
   background: #9d3f34;
 }
+.success-medal.review {
+  background: #9b7a24;
+}
 .personal-best {
   width: 100%;
   display: grid;
@@ -849,41 +852,28 @@ form { display: grid; gap: 16px; }
   overflow: hidden;
   z-index: 0;
 }
-.confetti::before, .confetti::after {
-  content: "";
+.confetti span {
   position: absolute;
-  top: -28px;
-  width: 180px;
-  height: 160px;
-  background:
-    radial-gradient(circle at 12px 16px, #344E41 0 4px, transparent 5px),
-    radial-gradient(circle at 58px 30px, #c2a747 0 4px, transparent 5px),
-    radial-gradient(circle at 92px 12px, #588157 0 4px, transparent 5px),
-    radial-gradient(circle at 132px 42px, #d5bd68 0 4px, transparent 5px),
-    repeating-linear-gradient(92deg, transparent 0 22px, rgba(52,78,65,.72) 22px 31px, transparent 31px 46px);
+  top: -18px;
+  border-radius: 2px;
   opacity: 0;
-  animation: confetti-fall 1.8s ease-out forwards;
+  will-change: transform, opacity;
+  animation: confetti-piece-fall linear forwards;
 }
-.confetti::before {
-  left: 8px;
-  transform: rotate(-13deg);
-}
-.confetti::after {
-  right: 0;
-  transform: rotate(14deg);
-  animation-delay: .16s;
-}
-@keyframes confetti-fall {
+@keyframes confetti-piece-fall {
   0% {
     opacity: 0;
-    translate: 0 -40px;
+    transform: translate3d(0, -24px, 0) rotate(0deg);
   }
-  18% {
-    opacity: .72;
+  8% {
+    opacity: .92;
+  }
+  82% {
+    opacity: .88;
   }
   100% {
     opacity: 0;
-    translate: 0 180px;
+    transform: translate3d(var(--confetti-drift, 0px), 82vh, 0) rotate(var(--confetti-rotate, 320deg));
   }
 }
 
@@ -924,6 +914,13 @@ form { display: grid; gap: 16px; }
   margin: 0;
   border-bottom: 1px solid rgba(52,78,65,.13);
 }
+.details-list .check-row { align-items: center; }
+.check-row .check-text strong { display: block; }
+.check-row .check-text small { display: block; color: rgba(52,78,65,.72); }
+.check-row b { font-weight: 700; white-space: nowrap; }
+.check-row .check-verdict-pass { color: var(--forest); }
+.check-row .check-verdict-review { color: #9b7a24; }
+.check-row .check-verdict-fail { color: #9b3b32; }
 .status-badge {
   width: max-content;
   display: inline-flex;

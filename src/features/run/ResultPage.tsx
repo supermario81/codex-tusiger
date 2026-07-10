@@ -10,14 +10,20 @@ import { ValidationBadge } from "../../components/ui/StatusBadge";
 import { formatDuration, formatPace } from "../../lib/geo/geo";
 import { localStore } from "../../lib/storage/localStore";
 
+function checkVerdictLabel(level: "pass" | "review" | "fail") {
+  return level === "pass" ? "erfüllt" : level === "review" ? "Prüfung" : "nicht erfüllt";
+}
+
 export function ResultPage() {
   const { runId } = useParams();
-  const { runs } = useApp();
+  const { config, runs } = useApp();
   const storedRun = useMemo(
     () => runId ? localStore.readRuns().find((item) => item.id === runId) ?? null : null,
     [runId]
   );
-  const run = runs.find((item) => item.id === runId) ?? storedRun;
+  // Lokale Kopie bevorzugen: sie enthält Punkte und Checks, die Supabase-Zeile nicht.
+  const contextRun = runs.find((item) => item.id === runId);
+  const run = storedRun && storedRun.points.length > 0 ? storedRun : contextRun ?? storedRun;
 
   if (!run) {
     return (
@@ -35,7 +41,21 @@ export function ResultPage() {
     : "nicht verfügbar";
 
   function exportJson() {
-    const blob = new Blob([JSON.stringify(selectedRun, null, 2)], { type: "application/json" });
+    // Diagnose-Export für Feldtests: kompletter Lauf inkl. aller Punkte,
+    // Validierungs-Checks, stabiler Referenzen und der aktiven Konfiguration.
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      app: "tusiger",
+      challengeConfig: config,
+      pointCount: selectedRun.points.length,
+      stableReferences: {
+        start: { lat: selectedRun.startLat, lng: selectedRun.startLng },
+        end: { lat: selectedRun.endLat, lng: selectedRun.endLng }
+      },
+      validationChecks: selectedRun.validationChecks ?? [],
+      run: selectedRun
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -69,9 +89,28 @@ export function ResultPage() {
           <p><Flag /> Zielkoordinaten <span>{selectedRun.endLat?.toFixed(6)}, {selectedRun.endLng?.toFixed(6)}</span></p>
           <p><ShieldCheck /> GPS-Genauigkeit <span>± {Math.round(selectedRun.gpsAccuracyAvgM ?? 0)} m</span></p>
           <p><Mountain /> Höhenmeter Anstieg <span>{Math.round(selectedRun.elevationGainM ?? 0)} m</span></p>
+          {selectedRun.trackingSummary?.cumulativeAscentM != null ? (
+            <p><Mountain /> Kumulativer Anstieg <span>{Math.round(selectedRun.trackingSummary.cumulativeAscentM)} m</span></p>
+          ) : null}
           <p><Timer /> Pace Durchschnitt <span>{formatPace(selectedRun.pacePer100StepsSeconds)}</span></p>
           <p><ShieldCheck /> Signalqualität <span>{confidenceText}</span></p>
-          <p><ShieldCheck /> Prüfungsdetails <span>{selectedRun.validationReasons.join(" ")}</span></p>
+        </GlassPanel>
+        <GlassPanel className="details-list">
+          <h2>Prüfungsdetails</h2>
+          {selectedRun.validationChecks?.length ? (
+            selectedRun.validationChecks.map((check) => (
+              <p key={check.rule} className="check-row">
+                <ShieldCheck />
+                <span className="check-text">
+                  <strong>{check.label}</strong>
+                  <small>{check.measured}</small>
+                </span>
+                <b className={`check-verdict-${check.level}`}>{checkVerdictLabel(check.level)}</b>
+              </p>
+            ))
+          ) : (
+            <p><ShieldCheck /> Prüfungsdetails <span>{selectedRun.validationReasons.join(" ")}</span></p>
+          )}
         </GlassPanel>
         <ValidationBadge status={selectedRun.status} />
         <Link to="/leaderboard"><Button>In Rangliste ansehen</Button></Link>
