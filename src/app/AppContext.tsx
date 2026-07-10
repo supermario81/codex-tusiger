@@ -379,24 +379,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRuns(localStore.readRuns());
       return;
     }
-    const { error } = await supabase.from("runs").upsert(toRunInsert(run));
-    if (error) throw error;
+    // Bei einem Retry (z. B. Netzabbruch mitten im Punkte-Upload) existiert der
+    // Lauf schon; die RLS-Policy erlaubt kein Update abgeschlossener Läufe.
+    const { data: existingRun, error: existingError } = await supabase
+      .from("runs")
+      .select("id")
+      .eq("id", run.id)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (!existingRun) {
+      const { error } = await supabase.from("runs").insert(toRunInsert(run));
+      if (error) throw error;
+    }
     if (run.points.length > 0) {
-      const { error: pointError } = await supabase.from("run_points").insert(
-        run.points.map((point) => ({
-          run_id: run.id,
-          user_id: user.id,
-          recorded_at: point.recordedAt,
-          lat: point.lat,
-          lng: point.lng,
-          altitude_m: point.altitudeM,
-          altitude_accuracy_m: point.altitudeAccuracyM,
-          accuracy_m: point.accuracyM,
-          speed_mps: point.speedMps,
-          heading: point.heading
-        }))
-      );
-      if (pointError) throw pointError;
+      // Bereits hochgeladene Punkte überspringen, Rest in Batches — die volle
+      // Aufzeichnung (bis zu 7200 Punkte) übersteigt sonst Payload-Limits.
+      const { count: uploadedCount, error: countError } = await supabase
+        .from("run_points")
+        .select("id", { count: "exact", head: true })
+        .eq("run_id", run.id);
+      if (countError) throw countError;
+      const pendingPoints = run.points.slice(uploadedCount ?? 0);
+      const batchSize = 500;
+      for (let offset = 0; offset < pendingPoints.length; offset += batchSize) {
+        const { error: pointError } = await supabase.from("run_points").insert(
+          pendingPoints.slice(offset, offset + batchSize).map((point) => ({
+            run_id: run.id,
+            user_id: user.id,
+            recorded_at: point.recordedAt,
+            lat: point.lat,
+            lng: point.lng,
+            altitude_m: point.altitudeM,
+            altitude_accuracy_m: point.altitudeAccuracyM,
+            accuracy_m: point.accuracyM,
+            speed_mps: point.speedMps,
+            heading: point.heading
+          }))
+        );
+        if (pointError) throw pointError;
+      }
     }
     await trackEvent("run_validated", { status: run.status });
     localStore.upsertRun(run);

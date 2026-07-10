@@ -42,6 +42,14 @@ export function createSyntheticRunPoints(durationSeconds = 4140): RunPoint[] {
   return points;
 }
 
+// Bewusst OHNE Limit: Validierung, Höhenmeter und Zonen-Prüfung brauchen die
+// komplette Aufzeichnung. Ein rollierender 300-Punkte-Puffer (slice(-300)) hat
+// früher jeden echten Lauf ungültig gemacht. Bei 1 Punkt/Sekunde und maximal
+// 2 Stunden sind das höchstens 7200 Punkte — problemlos im Speicher.
+export function appendRunPoint(points: RunPoint[], point: RunPoint): RunPoint[] {
+  return [...points, point];
+}
+
 export function positionToRunPoint(position: GeolocationPosition): RunPoint {
   return {
     recordedAt: new Date(position.timestamp).toISOString(),

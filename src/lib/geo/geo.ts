@@ -23,37 +23,62 @@ export function haversineDistanceMeters(
   return 2 * EARTH_RADIUS_M * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function averagePoint(points: RunPoint[]): RunPoint | null {
+export function medianValue(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+export function medianPoint(points: RunPoint[]): RunPoint | null {
   if (points.length === 0) {
     return null;
   }
 
-  const average = points.reduce(
-    (acc, point) => ({
-      lat: acc.lat + point.lat,
-      lng: acc.lng + point.lng,
-      altitudeM: acc.altitudeM + (point.altitudeM ?? 0),
-      altitudeCount: acc.altitudeCount + (point.altitudeM === null ? 0 : 1),
-      accuracyM: acc.accuracyM + point.accuracyM
-    }),
-    { lat: 0, lng: 0, altitudeM: 0, altitudeCount: 0, accuracyM: 0 }
-  );
-
-  const first = points[0];
+  const anchor = points[Math.floor(points.length / 2)];
+  const altitudes = points
+    .map((point) => point.altitudeM)
+    .filter((value): value is number => value !== null);
   return {
-    ...first,
-    lat: average.lat / points.length,
-    lng: average.lng / points.length,
-    altitudeM: average.altitudeCount > 0 ? average.altitudeM / average.altitudeCount : null,
-    accuracyM: average.accuracyM / points.length
+    ...anchor,
+    lat: medianValue(points.map((point) => point.lat)) ?? anchor.lat,
+    lng: medianValue(points.map((point) => point.lng)) ?? anchor.lng,
+    altitudeM: altitudes.length > 0 ? medianValue(altitudes) : null,
+    accuracyM: medianValue(points.map((point) => point.accuracyM)) ?? anchor.accuracyM
   };
 }
 
+const stableReferenceAccuracyMaxM = 30;
+
 export function stableEdgePoint(points: RunPoint[], edge: "start" | "end"): RunPoint | null {
-  const goodPoints = points.filter((point) => point.accuracyM <= 30);
+  const goodPoints = points.filter((point) => point.accuracyM <= stableReferenceAccuracyMaxM);
   const source = goodPoints.length >= 3 ? goodPoints : points;
   const edgePoints = edge === "start" ? source.slice(0, 5) : source.slice(-5);
-  return averagePoint(edgePoints);
+  return medianPoint(edgePoints);
+}
+
+// Einmalig eingefrorene Start-Referenz: Median der ersten 5 guten Punkte.
+// Liefert null, solange noch nicht genug Daten für eine stabile Referenz da sind.
+export function computeStableStartReference(points: RunPoint[]): RunPoint | null {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const window = points.slice(0, 20);
+  const goodPoints = window.filter((point) => point.accuracyM <= stableReferenceAccuracyMaxM);
+  if (goodPoints.length >= 5) {
+    return medianPoint(goodPoints.slice(0, 5));
+  }
+
+  if (points.length >= 20) {
+    const bestFive = [...window].sort((a, b) => a.accuracyM - b.accuracyM).slice(0, 5);
+    return medianPoint(bestFive);
+  }
+
+  return null;
 }
 
 export function calculateRouteDistance(points: RunPoint[]): number {

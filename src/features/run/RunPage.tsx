@@ -8,12 +8,12 @@ import { ProgressBar } from "../../components/ui/ProgressBar";
 import { motivationMessages } from "../../data/challenge";
 import { primeRunAudio } from "../../lib/audio/runAudio";
 import { debugRunEvent } from "../../lib/debug/runDebug";
-import { formatDuration, formatPace } from "../../lib/geo/geo";
+import { computeStableStartReference, formatDuration, formatPace, medianValue, stableEdgePoint } from "../../lib/geo/geo";
 import { analyzeRouteTrack } from "../../lib/geo/routeMatcher";
 import { localStore } from "../../lib/storage/localStore";
 import type { RouteTrackSummary, RunPoint, RunRecord } from "../../lib/types";
 import { validateRun } from "../../lib/validation/validateRun";
-import { positionToRunPoint } from "./runUtils";
+import { appendRunPoint, positionToRunPoint } from "./runUtils";
 
 function compactTrackingSummary(summary: RouteTrackSummary, telemetryLimit = 160): RouteTrackSummary {
   if (summary.telemetry.length <= telemetryLimit) {
@@ -42,7 +42,26 @@ export function RunPage() {
   const isFinishingRef = useRef(false);
   const lastPersistedAt = useRef(0);
   const lastLoggedPointCount = useRef(0);
+  const stableStartFrozen = useRef<RunPoint | null>(null);
   const tracking = useMemo(() => analyzeRouteTrack(fullPoints, config), [config, fullPoints]);
+
+  // Stabile Start-Referenz: einmal berechnet (Median der ersten guten Punkte),
+  // danach eingefroren — unabhängig von jeder späteren Puffer- oder UI-Logik.
+  const stableStart = useMemo(() => {
+    if (stableStartFrozen.current === null) {
+      stableStartFrozen.current = computeStableStartReference(fullPoints);
+      if (stableStartFrozen.current) {
+        debugRunEvent("stable_start_locked", {
+          lat: stableStartFrozen.current.lat,
+          lng: stableStartFrozen.current.lng,
+          altitudeM: stableStartFrozen.current.altitudeM,
+          accuracyM: stableStartFrozen.current.accuracyM,
+          pointCount: fullPoints.length
+        });
+      }
+    }
+    return stableStartFrozen.current;
+  }, [fullPoints]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -69,7 +88,7 @@ export function RunPage() {
       (position) => {
         const point = positionToRunPoint(position);
         setFullPoints((current) => {
-          const next = [...current, point];
+          const next = appendRunPoint(current, point);
           const shouldLog =
             next.length === 1 ||
             next.length - lastLoggedPointCount.current >= 25 ||
@@ -95,7 +114,10 @@ export function RunPage() {
 
   useEffect(() => {
     const now = Date.now();
-    if (now - lastPersistedAt.current < 2500 && fullPoints.length > 0) {
+    // Die ersten Punkte sofort sichern (damit ein früher Reload den Start behält),
+    // danach gedrosselt alle 10 Sekunden — die volle Aufzeichnung wird groß.
+    const persistIntervalMs = fullPoints.length <= 5 ? 0 : 10_000;
+    if (now - lastPersistedAt.current < persistIntervalMs) {
       return;
     }
     lastPersistedAt.current = now;
@@ -108,8 +130,8 @@ export function RunPage() {
       status: "draft",
       validationScore: 0,
       validationReasons: [],
-      startLat: fullPoints[0]?.lat ?? null,
-      startLng: fullPoints[0]?.lng ?? null,
+      startLat: stableStart?.lat ?? fullPoints[0]?.lat ?? null,
+      startLng: stableStart?.lng ?? fullPoints[0]?.lng ?? null,
       endLat: fullPoints.at(-1)?.lat ?? null,
       endLng: fullPoints.at(-1)?.lng ?? null,
       elevationGainM: null,
@@ -122,7 +144,7 @@ export function RunPage() {
       trackingSummary: compactTrackingSummary(tracking)
     };
     localStore.writeActiveRun(active);
-  }, [elapsed, fullPoints, startedAt, tracking, userId]);
+  }, [elapsed, fullPoints, stableStart, startedAt, tracking, userId]);
 
   useEffect(() => {
     if (fullPoints.length === 0) {
@@ -150,7 +172,19 @@ export function RunPage() {
   const steps = tracking.finalSteps;
   const pacePer100 = steps > 0 ? elapsed / (steps / 100) : null;
   const coach = motivationMessages.find((item) => steps >= item.minSteps && steps < item.maxSteps)?.message ?? "Du hast es gleich geschafft.";
-  const altitudeGain = Math.round(tracking.altitudeGainM ?? tracking.interpretedElevationGainM);
+  // Live-Höhenmeter relativ zur stabilen Start-Referenz (geglättet über die
+  // letzten 3 Höhenwerte), nicht relativ zu einem Pufferanfang.
+  const recentAltitude = medianValue(
+    fullPoints
+      .slice(-3)
+      .map((point) => point.altitudeM)
+      .filter((value): value is number => value !== null)
+  );
+  const liveElevationGain =
+    stableStart?.altitudeM != null && recentAltitude !== null
+      ? recentAltitude - stableStart.altitudeM
+      : tracking.altitudeGainM ?? tracking.interpretedElevationGainM;
+  const altitudeGain = Math.round(liveElevationGain);
 
   if (!profile) {
     return <Navigate to="/login" replace />;
@@ -172,6 +206,10 @@ export function RunPage() {
     const sourcePoints = [...fullPoints];
     const actualElapsed = Math.max(elapsed, (Date.now() - new Date(startedAt).getTime()) / 1000);
     const finishedAt = new Date(new Date(startedAt).getTime() + actualElapsed * 1000).toISOString();
+    // Stabile Referenzen: Start wurde früh eingefroren, Ziel ist der Median der
+    // letzten guten Punkte. Beide gehen in Validierung und Laufbericht ein.
+    const startReference = stableStart ?? stableEdgePoint(sourcePoints, "start");
+    const endReference = stableEdgePoint(sourcePoints, "end");
     const validation = validateRun({ startedAt, endedAt: finishedAt }, sourcePoints, config);
     const forceReview = localStorage.getItem("tusiger.forceReview") === "true";
     const status = forceReview && validation.status === "valid" ? "needs_review" : validation.status;
@@ -184,10 +222,10 @@ export function RunPage() {
       status,
       validationScore: validation.score,
       validationReasons: validation.reasons,
-      startLat: sourcePoints[0]?.lat ?? null,
-      startLng: sourcePoints[0]?.lng ?? null,
-      endLat: sourcePoints.at(-1)?.lat ?? null,
-      endLng: sourcePoints.at(-1)?.lng ?? null,
+      startLat: startReference?.lat ?? sourcePoints[0]?.lat ?? null,
+      startLng: startReference?.lng ?? sourcePoints[0]?.lng ?? null,
+      endLat: endReference?.lat ?? sourcePoints.at(-1)?.lat ?? null,
+      endLng: endReference?.lng ?? sourcePoints.at(-1)?.lng ?? null,
       elevationGainM: validation.metrics.elevationGain,
       gpsAccuracyAvgM: validation.metrics.gpsAccuracyAverage,
       gpsAccuracyMinM: validation.metrics.gpsAccuracyMin,
