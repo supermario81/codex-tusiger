@@ -867,6 +867,18 @@ form { display: grid; gap: 16px; }
   will-change: transform, opacity;
   animation: confetti-piece-fall linear forwards;
 }
+.confetti-fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.logo-celebration-test {
+  display: block;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
 @keyframes confetti-piece-fall {
   0% {
     opacity: 0;

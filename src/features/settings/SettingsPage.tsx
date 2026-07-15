@@ -21,7 +21,7 @@ export function SettingsPage() {
   }
 
   return (
-    <PageShell back>
+    <PageShell back logoCelebrationTest>
       <section className="simple-page">
         <h1>Einstellungen</h1>
         <GlassPanel>
