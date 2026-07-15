@@ -877,7 +877,10 @@ form { display: grid; gap: 16px; }
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: manipulation;
+  /* Kein Panning auf dem Logo: sonst bricht iOS den 2-s-Hold mit
+     pointercancel ab, sobald der Finger minimal wandert. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 @keyframes confetti-piece-fall {
   0% {

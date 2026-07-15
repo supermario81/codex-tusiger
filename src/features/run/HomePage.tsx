@@ -5,6 +5,7 @@ import { Logo } from "../../components/layout/Logo";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
+import { CelebrationTestTrigger } from "../../components/ui/Confetti";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { formatAppVersionLine } from "../../lib/appVersion";
 
@@ -38,7 +39,9 @@ export function HomePage() {
   return (
     <PageShell compactLogo={false}>
       <section className="hero-home">
-        <Logo />
+        <CelebrationTestTrigger>
+          <Logo />
+        </CelebrationTestTrigger>
         <GlassPanel className="progress-card">
           <p className="eyebrow">{t.today}</p>
           <strong>{steps}</strong>
