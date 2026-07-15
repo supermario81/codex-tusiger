@@ -55,6 +55,59 @@ const highConfidenceThreshold = 0.72;
 const maxInferredStepsPerRun = 80;
 const maxInferredStepsPerPoint = 18;
 
+// Sprung-Anomalien werden als EREIGNISSE gezählt, nicht als Punkte: Flags mit
+// weniger als 5 s Abstand gehören zum selben Ereignis. Physisch ist ein
+// Ereignis nur, wenn das Roh-GPS es hergibt (anhaltend > 8 m/s über mehrere
+// Punkte oder ein Einzel-Versatz > 100 m). Ein Routen-Fortschritts-Sprung bei
+// Geh-Tempo ist eine Matcher-Neuzuordnung (route_rematch), kein GPS-Sprung.
+const jumpEventGapSeconds = 5;
+const physicalSpeedMps = 8;
+const pedestrianSpeedMps = 3;
+const physicalSingleDisplacementM = 100;
+
+export type JumpFlagSample = {
+  atMs: number;
+  speedMps: number;
+  displacementM: number;
+  routeSnap: boolean;
+};
+
+export type JumpEventSummary = {
+  physicalJumpEventCount: number;
+  routeRematchEventCount: number;
+  maxJumpDisplacementM: number;
+};
+
+export function classifyJumpEvents(samples: JumpFlagSample[]): JumpEventSummary {
+  const sorted = [...samples].sort((a, b) => a.atMs - b.atMs);
+  const events: JumpFlagSample[][] = [];
+  sorted.forEach((sample) => {
+    const current = events.at(-1);
+    if (current && sample.atMs - (current.at(-1)?.atMs ?? 0) < jumpEventGapSeconds * 1000) {
+      current.push(sample);
+    } else {
+      events.push([sample]);
+    }
+  });
+
+  let physicalJumpEventCount = 0;
+  let routeRematchEventCount = 0;
+  let maxJumpDisplacementM = 0;
+  events.forEach((event) => {
+    const maxDisplacement = Math.max(...event.map((sample) => sample.displacementM));
+    const fastSamples = event.filter((sample) => sample.speedMps > physicalSpeedMps);
+    const physical = fastSamples.length >= 2 || maxDisplacement > physicalSingleDisplacementM;
+    if (physical) {
+      physicalJumpEventCount += 1;
+      maxJumpDisplacementM = Math.max(maxJumpDisplacementM, maxDisplacement);
+    } else {
+      routeRematchEventCount += 1;
+    }
+  });
+
+  return { physicalJumpEventCount, routeRematchEventCount, maxJumpDisplacementM };
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -258,6 +311,9 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       lowConfidencePointCount: 0,
       offRoutePointCount: 0,
       impossibleJumpCount: 0,
+      physicalJumpEventCount: 0,
+      routeRematchEventCount: 0,
+      maxJumpDisplacementM: 0,
       backwardJumpCount: 0,
       largeGapCount: 0,
       longestGapSeconds: 0,
@@ -292,7 +348,6 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   let filteredStepSpeed = 0;
   let lastAcceptedAt: number | null = null;
   let lastPoint: RunPoint | null = null;
-  let impossibleJumpCount = 0;
   let backwardJumpCount = 0;
   let largeGapCount = 0;
   let longestGapSeconds = 0;
@@ -306,6 +361,8 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   const altitudeConsistency: boolean[] = [];
   const telemetry: RoutePointTelemetry[] = [];
 
+  const jumpSamples: JumpFlagSample[] = [];
+
   sorted.forEach((point) => {
     const currentAt = new Date(point.recordedAt).getTime();
     const previousAt = lastPoint ? new Date(lastPoint.recordedAt).getTime() : currentAt;
@@ -314,12 +371,15 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     const flags = [...match.flags];
     let inferred = false;
     let routeSpeedMps: number | null = null;
+    let rawDistance = 0;
+    let rawSpeed = 0;
 
     if (lastPoint && dt > 0) {
-      const rawDistance = haversineDistanceMeters(lastPoint, point);
-      if (rawDistance / dt > 8) {
-        impossibleJumpCount += 1;
+      rawDistance = haversineDistanceMeters(lastPoint, point);
+      rawSpeed = rawDistance / dt;
+      if (rawSpeed > physicalSpeedMps) {
         flags.push("impossible_raw_jump");
+        jumpSamples.push({ atMs: currentAt, speedMps: rawSpeed, displacementM: rawDistance, routeSnap: false });
       }
       if (dt > 20) {
         largeGapCount += 1;
@@ -335,8 +395,15 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       const maxForward = dt > 0 ? dt * maxForwardStepsPerSecond : config.totalSteps;
       const maxBackward = Math.max(18, dt * maxBackDriftStepsPerSecond);
       if (match.progressSteps > previousSteps + maxForward + 45) {
-        impossibleJumpCount += 1;
-        flags.push("impossible_route_jump");
+        // Fortschritts-Sprung im Routenmodell: nur ein GPS-Sprung, wenn sich
+        // das Gerät laut Roh-GPS auch unrealistisch schnell bewegt hat. Bei
+        // Geh-Tempo ist es eine Matcher-Neuzuordnung nach Modellabweichung.
+        if (rawSpeed <= pedestrianSpeedMps) {
+          flags.push("route_rematch");
+        } else {
+          flags.push("impossible_route_jump");
+        }
+        jumpSamples.push({ atMs: currentAt, speedMps: rawSpeed, displacementM: rawDistance, routeSnap: true });
       }
       if (match.progressSteps < previousSteps - maxBackward) {
         backwardJumpCount += 1;
@@ -451,6 +518,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     0,
     (new Date(sorted.at(-1)?.recordedAt ?? sorted[0].recordedAt).getTime() - new Date(sorted[0].recordedAt).getTime()) / 1000
   );
+  const jumpEvents = classifyJumpEvents(jumpSamples);
 
   return {
     pointCount: sorted.length,
@@ -459,7 +527,10 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     estimatedPointCount,
     lowConfidencePointCount,
     offRoutePointCount,
-    impossibleJumpCount,
+    impossibleJumpCount: jumpEvents.physicalJumpEventCount,
+    physicalJumpEventCount: jumpEvents.physicalJumpEventCount,
+    routeRematchEventCount: jumpEvents.routeRematchEventCount,
+    maxJumpDisplacementM: jumpEvents.maxJumpDisplacementM,
     backwardJumpCount,
     largeGapCount,
     longestGapSeconds,

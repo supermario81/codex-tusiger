@@ -68,6 +68,9 @@ export type RouteTrackSummary = {
   lowConfidencePointCount: number;
   offRoutePointCount: number;
   impossibleJumpCount: number;
+  physicalJumpEventCount: number;
+  routeRematchEventCount: number;
+  maxJumpDisplacementM: number;
   backwardJumpCount: number;
   largeGapCount: number;
   longestGapSeconds: number;

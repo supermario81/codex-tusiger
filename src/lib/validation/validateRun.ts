@@ -24,25 +24,6 @@ function average(values: number[]): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function detectImpossibleJumps(points: RunPoint[]): number {
-  return points.reduce((count, point, index) => {
-    const previous = points[index - 1];
-    if (!previous) {
-      return count;
-    }
-
-    const distance = haversineDistanceMeters(previous, point);
-    const seconds =
-      (new Date(point.recordedAt).getTime() - new Date(previous.recordedAt).getTime()) / 1000;
-
-    if (seconds <= 0) {
-      return count;
-    }
-
-    return distance / seconds > 8 ? count + 1 : count;
-  }, 0);
-}
-
 export function validateRun(
   run: { startedAt: string; endedAt: string | null },
   points: RunPoint[],
@@ -248,19 +229,6 @@ export function validateRun(
     record("elevation", "Höhenmeter", elevationMeasured, "fail", "Höhenprofil nicht plausibel.");
   }
 
-  const impossibleJumps = detectImpossibleJumps(points);
-  const totalImpossibleJumps = impossibleJumps + tracking.impossibleJumpCount;
-  const jumpsMeasured = `${totalImpossibleJumps} unrealistische GPS-Sprünge`;
-  if (totalImpossibleJumps >= 3) {
-    record("jumps", "GPS-Sprünge", jumpsMeasured, "fail", "Mehrere unrealistische GPS-Sprünge erkannt.");
-  } else if (totalImpossibleJumps > 0) {
-    record("jumps", "GPS-Sprünge", jumpsMeasured, "review", "Einzelne GPS-Sprünge erkannt.");
-  } else if (points.length > 1 && tracking.routeAdherenceRatio >= 0.75) {
-    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "Route plausibel.");
-  } else {
-    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass");
-  }
-
   const progressMeasured = `${tracking.maxSteps} von ${config.totalSteps} Stufen erreicht`;
   if (routeCompletionStrong) {
     record("routeProgress", "Routenfortschritt", progressMeasured, "pass", "Routenfortschritt bis zur Zielzone plausibel.");
@@ -279,6 +247,40 @@ export function validateRun(
     record("adherence", "Treppenkorridor", adherenceMeasured, "review", "Viele GPS-Punkte waren seitlich ungenau, Abschluss und Route bleiben prüfbar.");
   } else {
     record("adherence", "Treppenkorridor", adherenceMeasured, "fail", "Zu viele Punkte liegen außerhalb des Treppenkorridors.");
+  }
+
+  // Sprung-Anomalien: physische Ereignisse (Roh-GPS > 8 m/s über mehrere
+  // Punkte oder Einzel-Versatz > 100 m) getrennt von Matcher-Neuzuordnungen.
+  // Aggregations-Guard: Wer nachweislich von der Start- zur Zielreferenz mit
+  // korrektem Anstieg im Korridor gelaufen ist, kann durch ein Sprung-Artefakt
+  // nicht hart ungültig werden — höchstens needs_review.
+  const levelOf = (rule: string) => checks.find((check) => check.rule === rule)?.level;
+  const coreChecksPass = ["startZone", "endZone", "gpsAccuracy", "duration", "elevation", "adherence"]
+    .every((rule) => levelOf(rule) === "pass");
+  const physicalJumps = tracking.physicalJumpEventCount;
+  const rematches = tracking.routeRematchEventCount;
+  const maxDisplacement = Math.round(tracking.maxJumpDisplacementM);
+  const rematchInfo = rematches > 0
+    ? `${rematches} Ereignis${rematches === 1 ? "" : "se"} Matcher-Neuzuordnung (kein GPS-Sprung)`
+    : "";
+  const jumpsMeasured =
+    physicalJumps > 0
+      ? `${physicalJumps} physische${physicalJumps === 1 ? "s" : ""} Sprung-Ereignis${physicalJumps === 1 ? "" : "se"}, max. Versatz ${maxDisplacement} m${rematchInfo ? `; ${rematchInfo}` : ""}`
+      : rematchInfo || "keine unrealistischen GPS-Sprünge";
+  if (physicalJumps >= 3 || tracking.maxJumpDisplacementM > 300) {
+    if (coreChecksPass) {
+      record("jumps", "GPS-Sprünge", jumpsMeasured, "review", "GPS-Sprünge erkannt, aber Start, Ziel, Zeit, Höhe und Korridor sind plausibel — Ergebnis braucht Prüfung.");
+    } else {
+      record("jumps", "GPS-Sprünge", jumpsMeasured, "fail", "Mehrere unrealistische GPS-Sprünge erkannt.");
+    }
+  } else if (physicalJumps > 0) {
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "review", "Einzelne GPS-Sprünge erkannt.");
+  } else if (rematches > 0) {
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "Route nach Matcher-Neuzuordnung plausibel fortgesetzt, kein GPS-Sprung.");
+  } else if (points.length > 1 && tracking.routeAdherenceRatio >= 0.75) {
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "Route plausibel.");
+  } else {
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass");
   }
 
   const continuityMeasured = `${Math.round(tracking.continuityScore * 100)} % der Streckenabschnitte erfasst`;
@@ -357,7 +359,7 @@ export function validateRun(
       continuityScore: tracking.continuityScore,
       offRoutePointCount: tracking.offRoutePointCount,
       lowConfidencePointCount: tracking.lowConfidencePointCount,
-      impossibleJumpCount: totalImpossibleJumps,
+      impossibleJumpCount: tracking.physicalJumpEventCount,
       inferredSteps: tracking.inferredSteps
     },
     tracking
