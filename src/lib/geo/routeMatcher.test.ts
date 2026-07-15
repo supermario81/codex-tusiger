@@ -20,7 +20,8 @@ function pointAtWaypoint(index: number): RunPoint {
 
 describe("matchPointToRoute", () => {
   it("projects a measured waypoint onto the matching route segment", () => {
-    const match = matchPointToRoute(pointAtWaypoint(11), defaultChallengeConfig);
+    const index = routeWaypoints.findIndex((waypoint) => waypoint.steps === 700);
+    const match = matchPointToRoute(pointAtWaypoint(index), defaultChallengeConfig);
 
     expect(match.progressSteps).toBeGreaterThan(690);
     expect(match.progressSteps).toBeLessThan(710);

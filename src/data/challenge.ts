@@ -164,23 +164,44 @@ export interface RouteWaypoint {
   altM: number;
 }
 
-// Gemessene Referenzpunkte entlang der Route (03.05.2025 & 10.05.2025).
+// Routenmodell v2 (2026-07-15): abgeleitet aus der vollständigen realen
+// Aufzeichnung vom 2026-07-14 (test/fixtures/run-2026-07-14.json, ±3–6 m
+// Genauigkeit). Polyline: Douglas-Peucker (ε = 3 m) über den Roh-Track plus
+// die 13 Kalibrier-Anker (fotografiert alle 100 Stufen) auf die Polyline
+// projiziert. Steps: stückweise linear über die kumulative Routendistanz
+// durch die Anker — flache Verbindungswege sind damit automatisch kodiert.
+// Höhen: geglättete GPS-Höhe, Anker exakt auf Messwert.
+// Verifikation im Replay: max. |Step-Fehler| an den Ankern 2,9; 0,00 % der
+// Punkte > 10 m von der Route (Altmodell v1: bis 66 Steps Fehler, 6,4 %).
+export const routeModelVersion = 2;
+
 export const routeWaypoints: RouteWaypoint[] = [
-  { steps: 0, lat: 47.315206, lng: 7.886942, altM: 421 },
-  { steps: 100, lat: 47.315443, lng: 7.886554, altM: 449 },
-  { steps: 200, lat: 47.3154, lng: 7.8862, altM: 460 },
-  { steps: 250, lat: 47.3159, lng: 7.8862, altM: 471 },
-  { steps: 300, lat: 47.316189, lng: 7.885925, altM: 494 },
-  { steps: 350, lat: 47.3166, lng: 7.8854, altM: 513 },
-  { steps: 400, lat: 47.3168, lng: 7.8852, altM: 524 },
-  { steps: 500, lat: 47.3171, lng: 7.8848, altM: 540 },
-  { steps: 550, lat: 47.317009, lng: 7.885031, altM: 529 },
-  { steps: 600, lat: 47.3174, lng: 7.8844, altM: 551 },
-  { steps: 650, lat: 47.3175, lng: 7.8844, altM: 559 },
-  { steps: 700, lat: 47.317886, lng: 7.884093, altM: 570 },
-  { steps: 777, lat: 47.318, lng: 7.8839, altM: 585 },
-  { steps: 800, lat: 47.3181, lng: 7.8838, altM: 590 },
-  { steps: 900, lat: 47.3183, lng: 7.8835, altM: 616 },
-  { steps: 1000, lat: 47.3186, lng: 7.8832, altM: 635 },
-  { steps: 1150, lat: 47.3189, lng: 7.8829, altM: 667 }
+  { steps: 0, lat: 47.315188, lng: 7.886946, altM: 425.5 },
+  { steps: 100, lat: 47.315491, lng: 7.886578, altM: 446.9 },
+  { steps: 113, lat: 47.315525, lng: 7.886536, altM: 448.9 },
+  { steps: 142, lat: 47.315628, lng: 7.886507, altM: 458.2 },
+  { steps: 200, lat: 47.315773, lng: 7.886283, altM: 467.3 },
+  { steps: 208, lat: 47.315797, lng: 7.886245, altM: 468.3 },
+  { steps: 250, lat: 47.315975, lng: 7.886111, altM: 477.5 },
+  { steps: 300, lat: 47.316152, lng: 7.88589, altM: 489.0 },
+  { steps: 339, lat: 47.31638, lng: 7.885606, altM: 501.1 },
+  { steps: 391, lat: 47.31673, lng: 7.885306, altM: 510.0 },
+  { steps: 400, lat: 47.316777, lng: 7.885233, altM: 516.3 },
+  { steps: 442, lat: 47.316909, lng: 7.885027, altM: 525.1 },
+  { steps: 500, lat: 47.317128, lng: 7.88482, altM: 536.7 },
+  { steps: 579, lat: 47.317407, lng: 7.884558, altM: 548.3 },
+  { steps: 600, lat: 47.317471, lng: 7.884472, altM: 554.2 },
+  { steps: 670, lat: 47.317692, lng: 7.884176, altM: 572.2 },
+  { steps: 694, lat: 47.31779, lng: 7.884125, altM: 566.5 },
+  { steps: 700, lat: 47.317785, lng: 7.884091, altM: 565.5 },
+  { steps: 707, lat: 47.317779, lng: 7.884056, altM: 567.1 },
+  { steps: 800, lat: 47.318048, lng: 7.883782, altM: 593.3 },
+  { steps: 863, lat: 47.318247, lng: 7.883578, altM: 611.1 },
+  { steps: 900, lat: 47.318345, lng: 7.883424, altM: 614.6 },
+  { steps: 946, lat: 47.318449, lng: 7.883262, altM: 624.3 },
+  { steps: 959, lat: 47.318486, lng: 7.883292, altM: 624.7 },
+  { steps: 1000, lat: 47.318603, lng: 7.883198, altM: 635.1 },
+  { steps: 1016, lat: 47.318647, lng: 7.883162, altM: 636.4 },
+  { steps: 1100, lat: 47.318845, lng: 7.882926, altM: 654.8 },
+  { steps: 1150, lat: 47.318961, lng: 7.882788, altM: 665.6 }
 ];
