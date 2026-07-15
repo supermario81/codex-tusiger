@@ -50,6 +50,22 @@ describe("validateRun", () => {
     expect(result.metrics.endDistanceToZone!).toBeLessThanOrEqual(defaultChallengeConfig.endRadiusM);
   });
 
+  it("still flags a genuine teleport as physical jump and never as valid", () => {
+    // Echter Teleport: 10 Ticks à ~50 m/s nach Norden (insgesamt ~500 m),
+    // danach Rücksprung auf die Route — das darf nie als valid durchgehen.
+    const points = createCalibrationRunPoints(1002).map((point, index) => {
+      if (index >= 500 && index < 510) {
+        return { ...point, lat: point.lat + (index - 499) * 0.00045 };
+      }
+      return point;
+    });
+    const result = runFor(points, 1002);
+
+    expect(result.tracking.physicalJumpEventCount).toBeGreaterThanOrEqual(1);
+    expect(result.tracking.maxJumpDisplacementM).toBeGreaterThan(300);
+    expect(result.status).not.toBe("valid");
+  });
+
   it("shows measured values with pass/fail per rule in the checks", () => {
     const result = runFor(createCalibrationRunPoints(1002), 1002);
     const startCheck = result.checks.find((check) => check.rule === "startZone");
