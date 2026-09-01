@@ -55,6 +55,56 @@ describe("fixture replay: real run 2026-07-14", () => {
   });
 });
 
+describe("end zone completion", () => {
+  // Der Zielreferenzpunkt der Challenge liegt 4,77 m vor dem letzten Vertex des
+  // Routenmodells; am Zielpodest projizierte der Feldtest deshalb nur auf 1143.
+  it("zeigt oben angekommen die vollen 1150 Stufen", () => {
+    const result = validateRun(fixtureRun, fixturePoints, defaultChallengeConfig);
+    expect(result.metrics.estimatedSteps).toBe(defaultChallengeConfig.totalSteps);
+    expect(result.metrics.maxProgressSteps).toBe(defaultChallengeConfig.totalSteps);
+    expect(result.status).toBe("valid");
+  });
+
+  it("gibt einem auf halber Strecke abgebrochenen Lauf keine vollen Stufen", () => {
+    const half = fixturePoints.slice(0, Math.floor(fixturePoints.length / 2));
+    const result = validateRun(
+      { startedAt: fixtureRun.startedAt, endedAt: half.at(-1)!.recordedAt },
+      half,
+      defaultChallengeConfig
+    );
+    expect(result.metrics.estimatedSteps).toBeLessThan(900);
+    expect(result.status).not.toBe("valid");
+  });
+
+  // Auf dem Zielreferenzpunkt der Config stehend fehlen ohne Snap ~11 Stufen —
+  // das ist der Fehlbetrag, den der Feldtest als 1143 von 1150 zeigte.
+  function finishAtConfigReference(accuracyM: number): RunPoint[] {
+    return fixturePoints.map((point, index) =>
+      index >= fixturePoints.length - 30
+        ? {
+            ...point,
+            lat: defaultChallengeConfig.endLat,
+            lng: defaultChallengeConfig.endLng,
+            accuracyM
+          }
+        : point
+    );
+  }
+
+  it("vervollstaendigt am Zielreferenzpunkt auf 1150", () => {
+    const tracking = analyzeRouteTrack(finishAtConfigReference(6), defaultChallengeConfig);
+    expect(tracking.finalSteps).toBe(defaultChallengeConfig.totalSteps);
+  });
+
+  it("schnappt nicht auf 1150, wenn der Fix im Ziel zu ungenau ist", () => {
+    const tracking = analyzeRouteTrack(
+      finishAtConfigReference(defaultChallengeConfig.gpsAccuracyReviewMaxM + 45),
+      defaultChallengeConfig
+    );
+    expect(tracking.finalSteps).toBeLessThan(defaultChallengeConfig.totalSteps);
+  });
+});
+
 describe("classifyJumpEvents", () => {
   it("clusters 14 consecutive pedestrian snap flags into ONE rematch event, zero physical", () => {
     // Exakt das Muster des Feldtests: 14 Flags im Sekundentakt bei Geh-Tempo.

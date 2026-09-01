@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterLeaderboardByTab, getInviteUrl, normalizeInviteCode, parseInviteInput } from "./community";
+import { filterLeaderboardByTab, getInviteUrl, normalizeInviteCode, parseInviteInput, rankLeaderboard } from "./community";
 import type { PublicRun } from "../types";
 
 const runs: PublicRun[] = [
@@ -10,6 +10,32 @@ const runs: PublicRun[] = [
 describe("community helpers", () => {
   it("filters leaderboard by today", () => {
     expect(filterLeaderboardByTab(runs, "Heute", new Date("2026-05-19T12:00:00Z"))).toHaveLength(1);
+  });
+
+  // Die Rangliste zeigte den Rang aus der ungefilterten Gesamtliste: im Tab
+  // "Heute" trug der einzige sichtbare Lauf plötzlich Rang 2.
+  it("vergibt den Rang erst nach dem Zeitfilter", () => {
+    const filtered = filterLeaderboardByTab(runs, "Heute", new Date("2026-05-19T12:00:00Z"));
+    expect(filtered[0].rank).toBe(1);
+
+    const secondOnly = filterLeaderboardByTab(runs, "Heute", new Date("2026-05-10T12:00:00Z"));
+    expect(secondOnly[0].rank).toBe(2);
+    expect(rankLeaderboard(secondOnly)[0].rank).toBe(1);
+  });
+
+  it("nummeriert eine gefilterte Liste lueckenlos ab 1", () => {
+    expect(rankLeaderboard(runs).map((run) => run.rank)).toEqual([1, 2]);
+    expect(rankLeaderboard([]).length).toBe(0);
+  });
+
+  it("laesst in der Zukunft datierte Laeufe nicht durch die Zeitfenster rutschen", () => {
+    const future: PublicRun[] = [
+      { ...runs[0], id: "future", date: "2027-01-01T08:00:00Z" }
+    ];
+    const now = new Date("2026-05-19T12:00:00Z");
+    expect(filterLeaderboardByTab(future, "Woche", now)).toHaveLength(0);
+    expect(filterLeaderboardByTab(future, "Monat", now)).toHaveLength(0);
+    expect(filterLeaderboardByTab(future, "Gesamt", now)).toHaveLength(1);
   });
 
   it("extracts invite codes from code-only and full links", () => {

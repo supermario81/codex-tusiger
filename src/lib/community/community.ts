@@ -24,6 +24,12 @@ export function filterLeaderboardByTab(runs: PublicRun[], tab: "Heute" | "Woche"
   });
 }
 
+// Rangfolge IMMER erst nach dem Zeitfilter vergeben: sonst trägt der erste
+// Eintrag eines gefilterten Zeitraums den Rang aus der ungefilterten Liste.
+export function rankLeaderboard(runs: PublicRun[]): PublicRun[] {
+  return runs.map((run, index) => ({ ...run, rank: index + 1 }));
+}
+
 function withTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }

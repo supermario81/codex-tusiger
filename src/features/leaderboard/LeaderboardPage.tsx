@@ -5,7 +5,7 @@ import { PageShell } from "../../components/layout/PageShell";
 import { Avatar } from "../../components/ui/Avatar";
 import { GlassPanel } from "../../components/ui/Card";
 import { formatDuration } from "../../lib/geo/geo";
-import { filterLeaderboardByTab } from "../../lib/community/community";
+import { filterLeaderboardByTab, rankLeaderboard } from "../../lib/community/community";
 
 // Die ID bleibt der deutsche Filter-Schlüssel (filterLeaderboardByTab), nur das
 // sichtbare Label wird übersetzt.
@@ -59,10 +59,7 @@ export function LeaderboardPage() {
   const activeSource = scope === "private" ? privateLeaderboard : leaderboard;
   // Rang muss nach dem Zeitfilter vergeben werden, sonst zeigt der erste Eintrag
   // eines gefilterten Zeitraums den Rang aus der ungefilterten Gesamtliste.
-  const source = filterLeaderboardByTab(activeSource, active).map((run, index) => ({
-    ...run,
-    rank: index + 1
-  }));
+  const source = rankLeaderboard(filterLeaderboardByTab(activeSource, active));
   const runsInReview = scope === "private" ? runs.filter((run) => run.status === "needs_review").length : 0;
   const podium = source.slice(0, 3);
   const rows = source.slice(3);
