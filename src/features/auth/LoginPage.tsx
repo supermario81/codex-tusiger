@@ -1,5 +1,5 @@
 import { ArrowLeft, LockKeyhole, LogOut, MailCheck, Send } from "lucide-react";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { Logo } from "../../components/layout/Logo";
@@ -8,6 +8,11 @@ import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { InstallHint } from "../../components/ui/InstallHint";
+
+// Supabase/GoTrue erlaubt standardmäßig höchstens eine Anmelde-Mail pro Minute.
+// Ein kürzerer Countdown würde den Knopf freigeben, während der Server noch
+// ablehnt.
+const resendCooldownSeconds = 60;
 
 const copy = {
   de: {
@@ -26,6 +31,11 @@ const copy = {
     continue: "Weiter zur App",
     switchAccount: "Anderes Konto verwenden",
     changeEmail: "E-Mail ändern",
+    resend: "Code erneut senden",
+    resending: "Sende erneut...",
+    resendWait: "Erneut senden in",
+    resendSent: "Neuer Code gesendet. Prüfe dein Postfach.",
+    resendRateLimited: "Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.",
     codeTitle: "Code eingeben",
     inbox: "Bitte prüfe deinen Posteingang und den Spam-Ordner.",
     sendFirst: "Sende zuerst deinen Code.",
@@ -51,6 +61,11 @@ const copy = {
     continue: "Continue to app",
     switchAccount: "Use another account",
     changeEmail: "Change email",
+    resend: "Resend code",
+    resending: "Resending...",
+    resendWait: "Resend available in",
+    resendSent: "New code sent. Check your inbox.",
+    resendRateLimited: "Too many requests. Please wait a moment and try again.",
     codeTitle: "Enter code",
     inbox: "Please check your inbox and spam folder.",
     sendFirst: "Send your code first.",
@@ -75,7 +90,26 @@ export function LoginPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNote, setResendNote] = useState("");
+  const [cooldown, setCooldown] = useState(0);
   const otpInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (cooldown <= 0) {
+      return;
+    }
+    const timer = window.setInterval(() => setCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
+
+  // Nur eine echte Rate-Limit-Antwort bekommt den Warte-Text; ein fehlendes
+  // Supabase-Setup darf nicht als "zu viele Anfragen" verkleidet werden.
+  function isRateLimit(cause: unknown) {
+    const message = (cause instanceof Error ? cause.message : String(cause ?? "")).toLowerCase();
+    return message.includes("rate limit") || message.includes("too many") || message.includes("429") ||
+      message.includes("only request this after") || message.includes("security purposes");
+  }
 
   async function sendCode(event: FormEvent) {
     event.preventDefault();
@@ -91,10 +125,32 @@ export function LoginPage() {
     try {
       await loginWithEmail(cleanEmail, language);
       setSent(true);
+      setResendNote("");
+      setCooldown(resendCooldownSeconds);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t.sendFailed);
+      setError(isRateLimit(cause) ? t.resendRateLimited : cause instanceof Error ? cause.message : t.sendFailed);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Neuer Code an dieselbe Adresse, ohne das Code-Formular abzuräumen.
+  async function resendCode() {
+    if (resending || cooldown > 0 || !email) {
+      return;
+    }
+    setError("");
+    setResendNote("");
+    setResending(true);
+    try {
+      await loginWithEmail(email, language);
+      setOtp("");
+      setResendNote(t.resendSent);
+      setCooldown(resendCooldownSeconds);
+    } catch (cause) {
+      setError(isRateLimit(cause) ? t.resendRateLimited : cause instanceof Error ? cause.message : t.sendFailed);
+    } finally {
+      setResending(false);
     }
   }
 
@@ -102,6 +158,7 @@ export function LoginPage() {
     setSent(false);
     setOtp("");
     setError("");
+    setResendNote("");
   }
 
   async function login(event: FormEvent) {
@@ -144,8 +201,8 @@ export function LoginPage() {
                 placeholder={t.emailPlaceholder}
                 onChange={(event) => setEmail(event.currentTarget.value)}
               />
-              <Button disabled={loading} icon={<Send />}>
-                {loading ? t.sending : t.send}
+              <Button disabled={loading || cooldown > 0} icon={<Send />}>
+                {loading ? t.sending : cooldown > 0 ? `${t.resendWait} ${cooldown}s` : t.send}
               </Button>
             </form>
           </GlassPanel>
@@ -154,6 +211,16 @@ export function LoginPage() {
             <div className="sent-icon"><MailCheck /></div>
             <h2>{t.sentTitle}</h2>
             <p>{t.sentBody} <strong>{email}</strong> {t.sentInstruction}</p>
+            {resendNote ? <p className="form-success">{resendNote}</p> : null}
+            <Button
+              type="button"
+              variant="secondary"
+              icon={<Send />}
+              disabled={resending || cooldown > 0}
+              onClick={() => void resendCode()}
+            >
+              {resending ? t.resending : cooldown > 0 ? `${t.resendWait} ${cooldown}s` : t.resend}
+            </Button>
             <button className="text-button" type="button" onClick={changeEmail}>
               <ArrowLeft /> {t.changeEmail}
             </button>
