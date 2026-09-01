@@ -498,6 +498,27 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
 
     maxSteps = Math.max(maxSteps, filteredSteps);
 
+    // Ziel-Snap: Der Zielreferenzpunkt der Challenge liegt 4,8 m vor dem letzten
+    // Polyline-Vertex; wer oben auf dem Podest steht, projiziert deshalb nur auf
+    // ~1136-1143 Stufen. Wer nachweislich mit brauchbarem GPS im Zielradius steht
+    // UND bereits beide Bedingungen für einen vollständigen Lauf erfüllt
+    // (maxSteps über der Abschluss-Schwelle und filteredSteps >= totalSteps-55),
+    // bekommt die vollen Stufen. Beide Bedingungen gelten schon vor dem Snap,
+    // damit der Snap ein Prüfergebnis nie erzeugen, sondern nur die Anzeige
+    // vervollständigen kann.
+    const completionThreshold = Math.max(config.totalSteps - 35, config.totalSteps * 0.96);
+    if (
+      filteredSteps < config.totalSteps &&
+      maxSteps >= completionThreshold &&
+      filteredSteps >= config.totalSteps - 55 &&
+      point.accuracyM <= config.gpsAccuracyReviewMaxM &&
+      haversineDistanceMeters(point, { lat: config.endLat, lng: config.endLng }) <= config.endRadiusM
+    ) {
+      filteredSteps = config.totalSteps;
+      maxSteps = config.totalSteps;
+      flags.push("end_zone_completion");
+    }
+
     const altitudeCanJudge = point.altitudeM !== null && (point.altitudeAccuracyM === null || point.altitudeAccuracyM <= 65);
     if (match.altitudeDeltaM !== null && altitudeCanJudge) {
       altitudeConsistency.push(Math.abs(match.altitudeDeltaM) <= 45);
