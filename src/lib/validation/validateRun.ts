@@ -261,7 +261,7 @@ export function validateRun(
   const rematches = tracking.routeRematchEventCount;
   const maxDisplacement = Math.round(tracking.maxJumpDisplacementM);
   const rematchInfo = rematches > 0
-    ? `${rematches} Ereignis${rematches === 1 ? "" : "se"} Matcher-Neuzuordnung (kein GPS-Sprung)`
+    ? `${rematches} Ereignis${rematches === 1 ? "" : "se"} ohne echten Ortswechsel (GPS-Ausreißer/Neuzuordnung, kein GPS-Sprung)`
     : "";
   const jumpsMeasured =
     physicalJumps > 0
@@ -276,7 +276,7 @@ export function validateRun(
   } else if (physicalJumps > 0) {
     record("jumps", "GPS-Sprünge", jumpsMeasured, "review", "Einzelne GPS-Sprünge erkannt.");
   } else if (rematches > 0) {
-    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "Route nach Matcher-Neuzuordnung plausibel fortgesetzt, kein GPS-Sprung.");
+    record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "GPS-Ausschlag ohne echten Ortswechsel, Route plausibel fortgesetzt.");
   } else if (points.length > 1 && tracking.routeAdherenceRatio >= 0.75) {
     record("jumps", "GPS-Sprünge", jumpsMeasured, "pass", "Route plausibel.");
   } else {

@@ -56,20 +56,33 @@ const maxInferredStepsPerRun = 80;
 const maxInferredStepsPerPoint = 18;
 
 // Sprung-Anomalien werden als EREIGNISSE gezählt, nicht als Punkte: Flags mit
-// weniger als 5 s Abstand gehören zum selben Ereignis. Physisch ist ein
-// Ereignis nur, wenn das Roh-GPS es hergibt (anhaltend > 8 m/s über mehrere
-// Punkte oder ein Einzel-Versatz > 100 m). Ein Routen-Fortschritts-Sprung bei
-// Geh-Tempo ist eine Matcher-Neuzuordnung (route_rematch), kein GPS-Sprung.
+// weniger als 5 s Abstand gehören zum selben Ereignis. Ob ein Ereignis physisch
+// ist, entscheidet der NETTO-Versatz über das Ereignis, nicht die Zahl schneller
+// Einzelmessungen: Ein GPS-Ausreißer ist immer eine Hin-und-Rück-Bewegung und
+// bringt das Gerät netto nirgendwo hin, echte schnelle Fortbewegung dagegen
+// summiert sich. Ein Routen-Fortschritts-Sprung bei Geh-Tempo ist eine
+// Matcher-Neuzuordnung (route_rematch), kein GPS-Sprung.
 const jumpEventGapSeconds = 5;
 const physicalSpeedMps = 8;
 const pedestrianSpeedMps = 3;
 const physicalSingleDisplacementM = 100;
+// Netto-Versatz, unterhalb dessen ein Ausschlag als Messrauschen gilt: mindestens
+// 30 m, bei schlechtem Empfang das Genauigkeitsbudget der beteiligten Punkte
+// (ein ±63-m-Fix kann allein durch Rauschen 44 m "wandern").
+const jumpNoiseFloorM = 30;
 
 export type JumpFlagSample = {
   atMs: number;
   speedMps: number;
   displacementM: number;
   routeSnap: boolean;
+  // Summe der Genauigkeiten der beiden beteiligten Punkte.
+  accuracyBudgetM?: number;
+  // Position vor und nach dem Sprung, für den Netto-Versatz des Ereignisses.
+  fromLat?: number;
+  fromLng?: number;
+  toLat?: number;
+  toLng?: number;
 };
 
 export type JumpEventSummary = {
@@ -96,7 +109,24 @@ export function classifyJumpEvents(samples: JumpFlagSample[]): JumpEventSummary 
   events.forEach((event) => {
     const maxDisplacement = Math.max(...event.map((sample) => sample.displacementM));
     const fastSamples = event.filter((sample) => sample.speedMps > physicalSpeedMps);
-    const physical = fastSamples.length >= 2 || maxDisplacement > physicalSingleDisplacementM;
+    const first = event[0];
+    const last = event.at(-1) ?? first;
+    // Netto-Versatz vom Beginn bis zum Ende des Ereignisses. Fehlen Positionen
+    // (z. B. handgebaute Testdaten), bleibt die Summe der Einzelversätze die
+    // konservative Annahme — sie kann ein Ereignis nur physisch machen.
+    const netDisplacementM =
+      first.fromLat !== undefined && first.fromLng !== undefined &&
+      last.toLat !== undefined && last.toLng !== undefined
+        ? haversineDistanceMeters(
+            { lat: first.fromLat, lng: first.fromLng },
+            { lat: last.toLat, lng: last.toLng }
+          )
+        : event.reduce((sum, sample) => sum + sample.displacementM, 0);
+    const accuracyBudgetM = Math.max(0, ...event.map((sample) => sample.accuracyBudgetM ?? 0));
+    const noiseToleranceM = Math.max(jumpNoiseFloorM, accuracyBudgetM);
+    const physical =
+      maxDisplacement > physicalSingleDisplacementM ||
+      (fastSamples.length >= 2 && netDisplacementM > noiseToleranceM);
     if (physical) {
       physicalJumpEventCount += 1;
       maxJumpDisplacementM = Math.max(maxJumpDisplacementM, maxDisplacement);
@@ -379,7 +409,17 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       rawSpeed = rawDistance / dt;
       if (rawSpeed > physicalSpeedMps) {
         flags.push("impossible_raw_jump");
-        jumpSamples.push({ atMs: currentAt, speedMps: rawSpeed, displacementM: rawDistance, routeSnap: false });
+        jumpSamples.push({
+          atMs: currentAt,
+          speedMps: rawSpeed,
+          displacementM: rawDistance,
+          routeSnap: false,
+          accuracyBudgetM: lastPoint.accuracyM + point.accuracyM,
+          fromLat: lastPoint.lat,
+          fromLng: lastPoint.lng,
+          toLat: point.lat,
+          toLng: point.lng
+        });
       }
       if (dt > 20) {
         largeGapCount += 1;
@@ -403,7 +443,17 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
         } else {
           flags.push("impossible_route_jump");
         }
-        jumpSamples.push({ atMs: currentAt, speedMps: rawSpeed, displacementM: rawDistance, routeSnap: true });
+        jumpSamples.push({
+          atMs: currentAt,
+          speedMps: rawSpeed,
+          displacementM: rawDistance,
+          routeSnap: true,
+          accuracyBudgetM: lastPoint ? lastPoint.accuracyM + point.accuracyM : point.accuracyM,
+          fromLat: lastPoint?.lat,
+          fromLng: lastPoint?.lng,
+          toLat: point.lat,
+          toLng: point.lng
+        });
       }
       if (match.progressSteps < previousSteps - maxBackward) {
         backwardJumpCount += 1;
