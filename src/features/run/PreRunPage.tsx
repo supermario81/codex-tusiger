@@ -30,6 +30,7 @@ export function PreRunPage() {
   const [state, setState] = useState<WatchState>("idle");
   const [fixes, setFixes] = useState<RunPoint[]>([]);
   const [message, setMessage] = useState("Standort noch nicht geprüft.");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const watchId = useRef<number | null>(null);
 
   const bestFix = useMemo(() => {
@@ -56,6 +57,15 @@ export function PreRunPage() {
   const canStart =
     accuracyOk && effectiveDistance !== null && effectiveDistance <= config.startRadiusM;
 
+  // Alter des besten Fixes, nur für die Anzeige. Unplausible Werte (Uhr des
+  // Geräts vs. Positionszeitstempel) werden verworfen statt angezeigt.
+  const fixAgeSeconds = (() => {
+    if (!bestFix) return null;
+    const age = Math.round((nowMs - new Date(bestFix.recordedAt).getTime()) / 1000);
+    return age >= 0 && age < 3600 ? age : null;
+  })();
+  const fixStale = fixAgeSeconds !== null && fixAgeSeconds > 25;
+
   function stopLocationWatch() {
     if (watchId.current !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(watchId.current);
@@ -64,6 +74,16 @@ export function PreRunPage() {
   }
 
   useEffect(() => stopLocationWatch, []);
+
+  // Sekundentakt nur während der Ortung, damit das Alter des Fixes sichtbar
+  // altert. Reine Anzeige — die Freigabe-Entscheidung hängt nicht daran.
+  useEffect(() => {
+    if (state !== "watching") {
+      return;
+    }
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [state]);
 
   if (!profile) {
     return <Navigate to="/login" replace />;
@@ -100,6 +120,15 @@ export function PreRunPage() {
     );
   }
 
+  // Erneute Prüfung: verwirft alle bisherigen Fixes (z. B. die vom falschen
+  // Standort 60 m weiter) und startet die Ortung neu. Ohne diesen Knopf gab es
+  // nach einem fehlgeschlagenen Check keinen Weg zurück — der einzige sichtbare
+  // Knopf war das deaktivierte "Starten".
+  function recheckLocation() {
+    setFixes([]);
+    startLocationWatch();
+  }
+
   function startRun(needsReview: boolean) {
     stopLocationWatch();
     localStorage.setItem("tusiger.forceReview", String(needsReview));
@@ -113,8 +142,10 @@ export function PreRunPage() {
     {
       icon: MapPin,
       label: "Standort",
-      text: bestFix ? `Position erfasst (${bestFix.lat.toFixed(5)}, ${bestFix.lng.toFixed(5)})` : message,
-      ok: Boolean(bestFix)
+      text: bestFix
+        ? `Position erfasst${fixAgeSeconds === null ? "" : ` · vor ${fixAgeSeconds} s`}${fixStale ? " — veraltet, bitte erneut prüfen" : ""}`
+        : message,
+      ok: Boolean(bestFix) && !fixStale
     },
     {
       icon: Navigation,
@@ -185,7 +216,12 @@ export function PreRunPage() {
         {state !== "watching" ? (
           <Button icon={<LocateFixed />} onClick={startLocationWatch}>Standort prüfen</Button>
         ) : (
-          <Button disabled={!canStart} icon={<Footprints />} onClick={() => startRun(false)}>Starten</Button>
+          <>
+            <Button disabled={!canStart} icon={<Footprints />} onClick={() => startRun(false)}>Starten</Button>
+            <Button variant="secondary" icon={<LocateFixed />} onClick={recheckLocation}>
+              Standort erneut prüfen
+            </Button>
+          </>
         )}
         {state === "watching" && stabilizing ? (
           <p className="pre-run-hint">GPS stabilisiert sich... ± {Math.round(bestFix?.accuracyM ?? 0)} m — ein paar Sekunden warten hilft.</p>
