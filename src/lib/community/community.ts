@@ -15,8 +15,11 @@ export function filterLeaderboardByTab(runs: PublicRun[], tab: "Heute" | "Woche"
   return runs.filter((run) => {
     const date = new Date(run.date);
     if (tab === "Heute") return date.toDateString() === now.toDateString();
-    if (tab === "Woche") return now.getTime() - date.getTime() <= 7 * 24 * 60 * 60 * 1000;
-    if (tab === "Monat") return now.getTime() - date.getTime() <= 31 * 24 * 60 * 60 * 1000;
+    // Beide Enden begrenzen: ein in der Zukunft datierter Lauf rutschte sonst
+    // durch jedes Zeitfenster.
+    const age = now.getTime() - date.getTime();
+    if (tab === "Woche") return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000;
+    if (tab === "Monat") return age >= 0 && age <= 31 * 24 * 60 * 60 * 1000;
     return true;
   });
 }

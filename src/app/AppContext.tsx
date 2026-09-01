@@ -241,11 +241,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      const { data: leaderboardRows } = await supabase
+      const { data: leaderboardRows, error: leaderboardError } = await supabase
         .from("leaderboard_public")
         .select("*")
         .order("duration_seconds", { ascending: true })
         .limit(100);
+      if (leaderboardError && import.meta.env.DEV) {
+        console.warn("Tusiger leaderboard query failed", leaderboardError);
+      }
 
       setLeaderboard(
         (leaderboardRows ?? []).map((row, index) => ({
@@ -422,7 +425,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await trackEvent("run_validated", { status: run.status });
     localStore.upsertRun(run);
     setRuns((current) => [run, ...current.filter((item) => item.id !== run.id)]);
-    setLeaderboard((current) => run.status === "valid" && profile?.showInPublicLeaderboard !== false ? [publicRunFromRun(run, current.length + 1, profile), ...current] : current);
+    // Der frisch gespeicherte Lauf muss nach Zeit einsortiert und die Rangfolge
+    // neu vergeben werden — vorher wurde er vorne angehängt und trug zugleich den
+    // letzten Rang, was Podest und Reihenfolge verfälschte.
+    setLeaderboard((current) => {
+      if (run.status !== "valid" || profile?.showInPublicLeaderboard === false) {
+        return current;
+      }
+      return [...current.filter((item) => item.id !== run.id), publicRunFromRun(run, 0, profile)]
+        .sort((a, b) => a.durationSeconds - b.durationSeconds)
+        .map((item, index) => ({ ...item, rank: index + 1 }));
+    });
   }, [profile, trackEvent, user]);
 
   const createGroup = useCallback(async (groupInput: Pick<Group, "name" | "description" | "isPrivate">) => {
