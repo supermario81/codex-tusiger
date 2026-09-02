@@ -326,7 +326,17 @@ export function validateRun(
     );
   }
 
-  const estimatedSteps = Math.round(Math.max(tracking.finalSteps, tracking.maxSteps >= completionThresholdSteps ? tracking.maxSteps : tracking.finalSteps));
+  // Der Live-Zaehler haengt am letzten Roh-Fix; war der verrauscht, blieb der
+  // Bericht bei z. B. 1145 stehen, obwohl der Lauf als Erfolg gewertet wurde.
+  // Die stabile Ziel-Referenz (Median der letzten guten Punkte) ist robuster:
+  // liegt sie im Zielradius und ist der Lauf ohnehin vollstaendig, zaehlt die
+  // volle Stufenzahl. Beide Bedingungen gelten schon vorher — der Wert kann
+  // damit kein Pruefergebnis erzeugen.
+  const finishedInEndZone =
+    routeCompletionStrong && endDistanceToZone !== null && endDistanceToZone <= config.endRadiusM;
+  const estimatedSteps = finishedInEndZone
+    ? config.totalSteps
+    : Math.round(Math.max(tracking.finalSteps, tracking.maxSteps >= completionThresholdSteps ? tracking.maxSteps : tracking.finalSteps));
   const pacePer100Steps =
     durationSeconds > 0 && estimatedSteps > 0 ? durationSeconds / (estimatedSteps / 100) : null;
   const status =

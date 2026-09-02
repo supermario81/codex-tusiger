@@ -71,6 +71,14 @@ const physicalSingleDisplacementM = 100;
 // (ein ±63-m-Fix kann allein durch Rauschen 44 m "wandern").
 const jumpNoiseFloorM = 30;
 
+// Start-Verankerung: Solange der Laeufer die Startzone noch nicht verlassen hat,
+// schiebt allein das GPS-Rauschen die Projektion 2-4 m die Route hoch — bei
+// 2,29 Stufen pro Meter am Streckenanfang sind das sofort 5-10 Stufen, bevor
+// ueberhaupt eine Stufe genommen wurde. Der hoechste dort projizierte Wert wird
+// deshalb als Nullpunkt gemerkt und spaeter abgezogen.
+const startAnchorRadiusM = 4;
+const maxStartAnchorSteps = 10;
+
 export type JumpFlagSample = {
   atMs: number;
   speedMps: number;
@@ -392,6 +400,22 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   const telemetry: RoutePointTelemetry[] = [];
 
   const jumpSamples: JumpFlagSample[] = [];
+  let startAnchorSteps = 0;
+  let startAnchorLocked = false;
+
+  // Nullpunkt-Korrektur: zieht den am Start faelschlich vergebenen Vorlauf ab
+  // und streckt den Rest wieder auf die volle Stufenzahl, damit oben exakt
+  // totalSteps stehen. Monoton und bei Anker 0 die Identitaet.
+  function withStartAnchor(steps: number): number {
+    if (startAnchorSteps <= 0) {
+      return steps;
+    }
+    const span = config.totalSteps - startAnchorSteps;
+    if (span <= 0) {
+      return steps;
+    }
+    return clamp(((steps - startAnchorSteps) * config.totalSteps) / span, 0, config.totalSteps);
+  }
 
   sorted.forEach((point) => {
     const currentAt = new Date(point.recordedAt).getTime();
@@ -425,6 +449,23 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
         largeGapCount += 1;
         longestGapSeconds = Math.max(longestGapSeconds, dt);
         flags.push("large_gap");
+      }
+    }
+
+    // Solange der Laeufer die Startzone nicht verlassen hat, gilt der dort
+    // projizierte Fortschritt als Rauschen und wird zum Nullpunkt.
+    if (!startAnchorLocked) {
+      const distanceToStartM = haversineDistanceMeters(point, { lat: config.startLat, lng: config.startLng });
+      if (distanceToStartM <= startAnchorRadiusM) {
+        if (match.confidence >= minGoodConfidence && !match.offRoute) {
+          startAnchorSteps = clamp(
+            Math.max(startAnchorSteps, match.progressSteps),
+            0,
+            maxStartAnchorSteps
+          );
+        }
+      } else if (startAnchorSteps > 0 || telemetry.length > 0) {
+        startAnchorLocked = true;
       }
     }
 
@@ -546,7 +587,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       projectedLng: match.projectedLng,
       segmentIndex: match.segmentIndex,
       progressSteps: Math.round(match.progressSteps),
-      filteredSteps: Math.round(filteredSteps),
+      filteredSteps: Math.round(withStartAnchor(filteredSteps)),
       distanceToRouteM: Math.round(match.distanceToRouteM * 10) / 10,
       accuracyM: Math.round(point.accuracyM * 10) / 10,
       rawAltitudeM: point.altitudeM,
@@ -606,8 +647,8 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     largeGapCount,
     longestGapSeconds,
     finalSteps,
-    maxSteps: Math.round(clamp(maxSteps, 0, config.totalSteps)),
-    progressRatio: clamp(maxSteps / config.totalSteps, 0, 1),
+    maxSteps: Math.round(clamp(withStartAnchor(maxSteps), 0, config.totalSteps)),
+    progressRatio: clamp(withStartAnchor(maxSteps) / config.totalSteps, 0, 1),
     rawDistanceMeters: calculateRouteDistance(sorted),
     projectedDistanceMeters,
     routeDistanceMeters: getRouteLengthMeters(),
