@@ -14,6 +14,7 @@ import { PreRunPage } from "../features/run/PreRunPage";
 import { ResultPage } from "../features/run/ResultPage";
 import { RunPage } from "../features/run/RunPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
+import { CalibrationPage } from "../features/calibration/CalibrationPage";
 import { readPendingInviteCode, savePendingInviteCode } from "../lib/community/community";
 import { useApp } from "./AppContext";
 
@@ -74,6 +75,7 @@ export function App() {
       <Route path="/groups/new" element={<Gate><GroupsPage mode="new" /></Gate>} />
       <Route path="/groups/join" element={<Gate><GroupsPage mode="join" /></Gate>} />
       <Route path="/groups/:groupId" element={<Gate><GroupsPage mode="detail" /></Gate>} />
+      <Route path="/calibration" element={<Gate><CalibrationPage /></Gate>} />
       <Route path="/profile" element={<Gate><ProfilePage /></Gate>} />
       <Route path="/history" element={<Gate><HistoryPage /></Gate>} />
       <Route path="/donate" element={<Gate><HistoryPage focusDonate /></Gate>} />

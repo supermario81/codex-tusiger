@@ -105,6 +105,7 @@ class SensorLogger {
   private latestHeading: number | null = null;
   private motionHandler: ((event: DeviceMotionEvent) => void) | null = null;
   private orientationHandler: ((event: DeviceOrientationEvent) => void) | null = null;
+  private genericSensors: Array<{ stop: () => void }> = [];
 
   get isRecording(): boolean {
     return this.recording;
@@ -159,10 +160,66 @@ class SensorLogger {
     if (typeof window !== "undefined") {
       window.addEventListener("devicemotion", this.motionHandler);
       window.addEventListener("deviceorientation", this.orientationHandler);
+      this.startGenericSensors();
     }
   }
 
+  // Chrome auf Android liefert ueber die Generic Sensor API Werte, die iOS
+  // Safari nicht hat — vor allem das rohe Magnetometer und eine verlaessliche
+  // lineare Beschleunigung. Barometer und Schrittzaehler gibt es auch dort
+  // nicht; die Spalten bleiben leer.
+  private startGenericSensors(): void {
+    const scope = window as unknown as Record<string, unknown>;
+
+    const attach = (
+      name: string,
+      frequency: number,
+      apply: (reading: { x: number | null; y: number | null; z: number | null }) => void
+    ) => {
+      const Ctor = scope[name] as (new (options: { frequency: number }) => {
+        addEventListener: (type: string, listener: () => void) => void;
+        start: () => void;
+        stop: () => void;
+        x?: number;
+        y?: number;
+        z?: number;
+      }) | undefined;
+      if (typeof Ctor !== "function") {
+        return;
+      }
+      try {
+        const sensor = new Ctor({ frequency });
+        sensor.addEventListener("reading", () => {
+          apply({ x: sensor.x ?? null, y: sensor.y ?? null, z: sensor.z ?? null });
+        });
+        sensor.start();
+        this.genericSensors.push({ stop: () => sensor.stop() });
+      } catch {
+        // Sensor gesperrt oder nicht vorhanden: der Rest laeuft weiter.
+      }
+    };
+
+    attach("Magnetometer", 10, (reading) => {
+      this.latestMotion.magX = reading.x;
+      this.latestMotion.magY = reading.y;
+      this.latestMotion.magZ = reading.z;
+    });
+    attach("LinearAccelerationSensor", 10, (reading) => {
+      this.latestMotion.linAccX = reading.x;
+      this.latestMotion.linAccY = reading.y;
+      this.latestMotion.linAccZ = reading.z;
+    });
+  }
+
   stop(): void {
+    this.genericSensors.forEach((sensor) => {
+      try {
+        sensor.stop();
+      } catch {
+        // Bereits gestoppt.
+      }
+    });
+    this.genericSensors = [];
     if (typeof window !== "undefined") {
       if (this.motionHandler) window.removeEventListener("devicemotion", this.motionHandler);
       if (this.orientationHandler) window.removeEventListener("deviceorientation", this.orientationHandler);

@@ -1,4 +1,4 @@
-import { Activity, Trash2 } from "lucide-react";
+import { Activity, Footprints, Trash2 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
@@ -73,6 +73,12 @@ export function SettingsPage() {
             />
           </label>
           {sensorNote ? <small>{sensorNote}</small> : null}
+          <p>
+            Für die Streckenvermessung: einmal abgehen und jeden Übergang zwischen
+            Treppe und stufenlosem Weg markieren. Daraus entsteht das Routenmodell
+            mit exakter Stufenzahl je Abschnitt.
+          </p>
+          <Link className="action-row" to="/calibration"><Footprints /> Streckenkalibrierung</Link>
         </GlassPanel>
         <GlassPanel>
           <h2>Account löschen</h2>
