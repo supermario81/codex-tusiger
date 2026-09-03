@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from "react";
-import { History, ImagePlus, LogOut, Settings, Trophy, UsersRound } from "lucide-react";
+import { ChevronRight, History, ImagePlus, LogOut, Settings, Trophy, UsersRound } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
@@ -26,7 +26,9 @@ export function ProfilePage() {
     empty: "No runs saved yet.",
     groups: "Groups",
     story: "Story",
-    settings: "Privacy & settings"
+    settings: "Privacy & settings",
+    openDetail: "Open run report",
+    statusLabels: { valid: "Verified", needs_review: "Under review", invalid: "Invalid", draft: "Draft" }
   } : {
     title: "Profil",
     optimizing: "Avatar wird optimiert...",
@@ -42,8 +44,11 @@ export function ProfilePage() {
     empty: "Noch keine Läufe gespeichert.",
     groups: "Gruppen",
     story: "Geschichte",
-    settings: "Datenschutz & Einstellungen"
+    settings: "Datenschutz & Einstellungen",
+    openDetail: "Laufbericht öffnen",
+    statusLabels: { valid: "Gültig", needs_review: "In Prüfung", invalid: "Ungültig", draft: "Entwurf" }
   };
+  const dateLocale = language === "en" ? "en-GB" : "de-CH";
   const [avatarState, setAvatarState] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [visibilityState, setVisibilityState] = useState("");
@@ -119,8 +124,13 @@ export function ProfilePage() {
         </GlassPanel>
         <GlassPanel className="run-history-list">
           <h2>{t.history}</h2>
-          {runs.length === 0 ? <p>{t.empty}</p> : runs.slice(0, 5).map((run) => (
-            <p key={run.id}>{new Date(run.startedAt).toLocaleDateString("de-CH")} <strong>{formatDuration(run.durationSeconds)}</strong> <span>{run.status}</span></p>
+          {runs.length === 0 ? <p>{t.empty}</p> : runs.map((run) => (
+            <Link className="run-history-row" key={run.id} to={`/result/${run.id}`} aria-label={t.openDetail}>
+              <span>{new Date(run.startedAt).toLocaleDateString(dateLocale)}</span>
+              <strong>{formatDuration(run.durationSeconds)}</strong>
+              <span className={`status-${run.status}`}>{t.statusLabels[run.status]}</span>
+              <ChevronRight aria-hidden />
+            </Link>
           ))}
         </GlassPanel>
         <Link className="action-row" to="/groups"><UsersRound /> {t.groups}</Link>

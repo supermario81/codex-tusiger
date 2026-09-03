@@ -19,8 +19,24 @@ export function toRunInsert(run: RunRecord) {
     gps_accuracy_min_m: run.gpsAccuracyMinM,
     gps_accuracy_max_m: run.gpsAccuracyMaxM,
     estimated_steps: run.estimatedSteps,
-    pace_per_100_steps_seconds: run.pacePer100StepsSeconds
+    pace_per_100_steps_seconds: run.pacePer100StepsSeconds,
+    validation_checks: run.validationChecks ?? [],
+    // Ohne Telemetrie: die Zusammenfassung reicht dem Bericht, die Punktliste
+    // liegt in run_points.
+    tracking_summary: run.trackingSummary
+      ? { ...run.trackingSummary, telemetry: [] }
+      : null
   };
+}
+
+// Spalten, die erst mit Migration 0009 existieren. Fehlen sie, faellt der
+// Insert auf das alte Schema zurueck statt den Lauf ganz zu verlieren.
+export const runDetailColumns = ["validation_checks", "tracking_summary"] as const;
+
+export function toRunInsertWithoutDetails(run: RunRecord) {
+  const row = toRunInsert(run) as Record<string, unknown>;
+  runDetailColumns.forEach((column) => delete row[column]);
+  return row;
 }
 
 export function fromConfigRow(row: Record<string, unknown>): ChallengeConfig {
@@ -84,7 +100,13 @@ export function fromRunRow(row: Record<string, unknown>): RunRecord {
     gpsAccuracyMaxM: row.gps_accuracy_max_m === null ? null : Number(row.gps_accuracy_max_m),
     estimatedSteps: Number(row.estimated_steps ?? 0),
     pacePer100StepsSeconds: row.pace_per_100_steps_seconds === null ? null : Number(row.pace_per_100_steps_seconds),
-    points: []
+    points: [],
+    validationChecks: Array.isArray(row.validation_checks)
+      ? (row.validation_checks as RunRecord["validationChecks"])
+      : undefined,
+    trackingSummary: row.tracking_summary
+      ? (row.tracking_summary as RunRecord["trackingSummary"])
+      : undefined
   };
 }
 

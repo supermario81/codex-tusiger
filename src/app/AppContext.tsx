@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { defaultChallengeConfig, historyFallback, legalFallback } from "../data/challenge";
 import { normalizeInviteCode } from "../lib/community/community";
 import { isSupabaseConfigured, supabase } from "../lib/supabase/client";
-import { fromConfigRow, fromGroupRow, fromHistoryRow, fromLegalRow, fromProfileRow, fromRunRow, toRunInsert } from "../lib/supabase/mappers";
+import { fromConfigRow, fromGroupRow, fromHistoryRow, fromLegalRow, fromProfileRow, fromRunRow, toRunInsert, toRunInsertWithoutDetails } from "../lib/supabase/mappers";
 import { localStore } from "../lib/storage/localStore";
 import type { ChallengeConfig, Group, HistoryItem, LegalPage, Profile, PublicRun, RunRecord } from "../lib/types";
 
@@ -392,7 +392,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (existingError) throw existingError;
     if (!existingRun) {
       const { error } = await supabase.from("runs").insert(toRunInsert(run));
-      if (error) throw error;
+      if (error) {
+        // Migration 0009 (validation_checks/tracking_summary) noch nicht
+        // eingespielt: lieber ohne die Detailspalten speichern als den Lauf
+        // verlieren. Die Details bleiben lokal erhalten.
+        const message = errorMessage(error).toLowerCase();
+        const missingDetailColumn =
+          message.includes("validation_checks") || message.includes("tracking_summary");
+        if (!missingDetailColumn) throw error;
+        if (import.meta.env.DEV) console.warn("Tusiger run detail columns missing, run 0009 migration", error);
+        const { error: fallbackError } = await supabase.from("runs").insert(toRunInsertWithoutDetails(run));
+        if (fallbackError) throw fallbackError;
+      }
     }
     if (run.points.length > 0) {
       // Bereits hochgeladene Punkte überspringen, Rest in Batches — die volle
