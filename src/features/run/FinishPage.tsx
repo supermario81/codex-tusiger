@@ -50,7 +50,7 @@ export function FinishPage() {
   return (
     <PageShell nav={false} logoCelebrationTest>
       <section className="finish-page">
-        {isCelebration ? <ConfettiBurst /> : null}
+        {isCelebration ? <ConfettiBurst fixed /> : null}
         <GlassPanel className="finish-card">
           <span className={`success-medal ${isCelebration ? (isReview ? "review" : "") : "fail"}`}>
             {isCelebration ? (isReview ? <Clock3 /> : <Check />) : <XCircle />}
