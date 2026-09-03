@@ -29,6 +29,44 @@ describe("Kalibrier-Recorder", () => {
     calibrationLog.endStairs(180);
     expect(calibrationLog.currentSectionKind).toBe("path");
     expect(calibrationLog.currentSectionIndex).toBe(2);
+    expect(calibrationLog.lastConfirmedSteps).toBe(180);
+    calibrationLog.stop();
+  });
+
+  // Der Nutzer traegt den laufenden Zaehlerstand ein, nicht die Abschnittslaenge.
+  it("leitet die Abschnittslaenge aus der Differenz der Zaehlerstaende ab", () => {
+    calibrationLog.start("walk-cumulative", Date.now());
+    calibrationLog.addTrackPoint(point(47.315188, 7.886946));
+
+    calibrationLog.startStairs();
+    const first = calibrationLog.endStairs(180);
+    expect(first?.cumulativeSteps).toBe(180);
+    expect(first?.sectionSteps).toBe(180);
+
+    calibrationLog.startStairs();
+    const second = calibrationLog.endStairs(400);
+    expect(second?.cumulativeSteps).toBe(400);
+    expect(second?.sectionSteps).toBe(220);
+
+    calibrationLog.startStairs();
+    const third = calibrationLog.endStairs(1150);
+    expect(third?.sectionSteps).toBe(750);
+    expect(calibrationLog.lastConfirmedSteps).toBe(1150);
+    calibrationLog.stop();
+  });
+
+  it("nimmt einen bestaetigten Abschnitt samt Zaehlerstand zurueck", () => {
+    calibrationLog.start("walk-undo", Date.now());
+    calibrationLog.addTrackPoint(point(47.315188, 7.886946));
+    calibrationLog.startStairs();
+    calibrationLog.endStairs(180);
+    calibrationLog.startStairs();
+    calibrationLog.endStairs(400);
+    expect(calibrationLog.lastConfirmedSteps).toBe(400);
+
+    calibrationLog.undoLast();
+    expect(calibrationLog.lastConfirmedSteps).toBe(180);
+    expect(calibrationLog.currentSectionKind).toBe("stairs");
     calibrationLog.stop();
   });
 
@@ -71,7 +109,7 @@ describe("Kalibrier-Recorder", () => {
 
     const marks = calibrationLog.marksCsv().trim().split("\n");
     expect(marks[0]).toBe(
-      "mark_index,timestamp_ms,kind,section_index,section_kind,section_steps,marker_steps,lat,lng,altitude_m,accuracy_m,walk_id"
+      "mark_index,timestamp_ms,kind,section_index,section_kind,cumulative_steps,section_steps,marker_steps,lat,lng,altitude_m,accuracy_m,walk_id"
     );
     expect(marks[1]).toContain("stairs_start");
     expect(marks[2]).toContain("stairs_end");

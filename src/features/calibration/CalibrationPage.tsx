@@ -102,19 +102,23 @@ export function CalibrationPage() {
       sync();
       return;
     }
-    // Treppe endet: Stufenzahl dieses Abschnitts erfragen.
-    setPendingSteps("");
+    // Treppe endet: Zaehlerstand erfragen, bei dem der Abschnitt geendet hat.
+    // Vorbelegt mit dem Stand aus den 50er-Marken, falls er weitergezaehlt hat.
+    const suggestion = calibrationLog.stepsFromMarkers;
+    setPendingSteps(suggestion > calibrationLog.lastConfirmedSteps ? String(suggestion) : "");
     setAskSteps(true);
   }
 
   function confirmSectionSteps() {
     const parsed = Number.parseInt(pendingSteps, 10);
-    calibrationLog.endStairs(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+    const valid = Number.isFinite(parsed) && parsed > 0;
+    const previous = calibrationLog.lastConfirmedSteps;
+    const mark = calibrationLog.endStairs(valid ? parsed : null);
     setAskSteps(false);
     setNote(
-      Number.isFinite(parsed) && parsed > 0
-        ? `Abschnitt mit ${parsed} Stufen gespeichert.`
-        : "Abschnitt ohne Stufenzahl gespeichert."
+      valid
+        ? `Abschnitt bis Stufe ${parsed} gespeichert (${mark?.sectionSteps ?? parsed - previous} Stufen).`
+        : "Abschnitt ohne Zählerstand gespeichert — bitte in der CSV nachtragen."
     );
     sync();
   }
@@ -134,7 +138,10 @@ export function CalibrationPage() {
   }
 
   const stairSections = marks.filter((mark) => mark.kind === "stairs_end");
-  const totalCountedSteps = stairSections.reduce((sum, mark) => sum + (mark.sectionSteps ?? 0), 0);
+  const totalCountedSteps = stairSections.reduce(
+    (highest, mark) => Math.max(highest, mark.cumulativeSteps ?? 0),
+    0
+  );
 
   return (
     <PageShell back nav={false}>
@@ -200,7 +207,9 @@ export function CalibrationPage() {
                   <Footprints />
                   <span className="check-text">
                     <strong>Treppenabschnitt {mark.sectionIndex - 1}</strong>
-                    <small>{mark.lat.toFixed(6)}, {mark.lng.toFixed(6)} · ± {Math.round(mark.accuracyM)} m</small>
+                    <small>
+                      bis Stufe {mark.cumulativeSteps ?? "?"} · {mark.lat.toFixed(6)}, {mark.lng.toFixed(6)}
+                    </small>
                   </span>
                   <b>{mark.sectionSteps ?? "?"}</b>
                 </p>
@@ -244,10 +253,14 @@ export function CalibrationPage() {
         {askSteps ? (
           <div className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Stufenzahl eintragen">
             <div>
-              <h2>Wie viele Stufen hatte dieser Abschnitt?</h2>
-              <p>Aus den 50er-Marken gezählt: {markerSteps}. Leer lassen, wenn du es nachtragen willst.</p>
+              <h2>Bei welcher Stufe hat der Abschnitt geendet?</h2>
+              <p>
+                Dein Zählerstand insgesamt, nicht die Stufen dieses Abschnitts. Letzter
+                bestätigter Stand: {calibrationLog.lastConfirmedSteps}. Aus den 50er-Marken
+                gezählt: {markerSteps}. Leer lassen, wenn du es nachtragen willst.
+              </p>
               <label className="input-wrap">
-                <span>Stufen in diesem Abschnitt</span>
+                <span>Zählerstand am Ende des Abschnitts</span>
                 <input
                   autoFocus
                   inputMode="numeric"

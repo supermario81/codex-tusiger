@@ -17,7 +17,10 @@ export type CalibrationMark = {
   kind: MarkKind;
   sectionIndex: number;
   sectionKind: "stairs" | "path";
-  // Nur bei stairs_end: die vom Nutzer eingetragene Stufenzahl des Abschnitts.
+  // Nur bei stairs_end: der vom Nutzer eingetragene Zaehlerstand, bei dem der
+  // Abschnitt geendet hat (kumulativ ueber die ganze Strecke).
+  cumulativeSteps: number | null;
+  // Daraus abgeleitet: Laenge dieses Abschnitts in Stufen.
   sectionSteps: number | null;
   // Aus den 50er-Marken hochgezählt, unabhängig von der Eingabe.
   markerSteps: number;
@@ -41,6 +44,7 @@ class CalibrationRecorder {
   private sectionIndex = 0;
   private sectionKind: "stairs" | "path" = "path";
   private markerSteps = 0;
+  private lastCumulativeSteps = 0;
   private walkId = "";
 
   get isRecording(): boolean {
@@ -54,6 +58,10 @@ class CalibrationRecorder {
   }
   get stepsFromMarkers(): number {
     return this.markerSteps;
+  }
+  // Zaehlerstand am Ende des zuletzt abgeschlossenen Treppenabschnitts.
+  get lastConfirmedSteps(): number {
+    return this.lastCumulativeSteps;
   }
   get markList(): CalibrationMark[] {
     return this.marks;
@@ -76,6 +84,7 @@ class CalibrationRecorder {
     this.sectionIndex = 0;
     this.sectionKind = "path";
     this.markerSteps = 0;
+    this.lastCumulativeSteps = 0;
     this.walkId = walkId;
   }
 
@@ -92,7 +101,11 @@ class CalibrationRecorder {
     return this.track.at(-1) ?? null;
   }
 
-  private push(kind: MarkKind, sectionSteps: number | null): CalibrationMark | null {
+  private push(
+    kind: MarkKind,
+    cumulativeSteps: number | null,
+    sectionSteps: number | null
+  ): CalibrationMark | null {
     const point = this.lastPoint();
     if (!this.recording || !point) {
       return null;
@@ -103,6 +116,7 @@ class CalibrationRecorder {
       kind,
       sectionIndex: this.sectionIndex,
       sectionKind: this.sectionKind,
+      cumulativeSteps,
       sectionSteps,
       markerSteps: this.markerSteps,
       lat: point.lat,
@@ -117,7 +131,7 @@ class CalibrationRecorder {
   // Treppenabschnitt beginnt: der stufenlose Abschnitt davor ist beendet.
   startStairs(): CalibrationMark | null {
     if (this.sectionKind === "stairs") return null;
-    const mark = this.push("stairs_start", null);
+    const mark = this.push("stairs_start", null, null);
     if (mark) {
       this.sectionIndex += 1;
       this.sectionKind = "stairs";
@@ -125,11 +139,19 @@ class CalibrationRecorder {
     return mark;
   }
 
-  // Treppenabschnitt endet: die gezählte Stufenzahl gehört zu diesem Abschnitt.
-  endStairs(sectionSteps: number | null): CalibrationMark | null {
+  // Treppenabschnitt endet: der Nutzer traegt den Zaehlerstand ein, BEI dem der
+  // Abschnitt geendet hat. Die Abschnittslaenge ergibt sich aus der Differenz
+  // zum zuletzt bestaetigten Stand — so muss beim Gehen nichts zurueckgesetzt
+  // werden.
+  endStairs(cumulativeSteps: number | null): CalibrationMark | null {
     if (this.sectionKind !== "stairs") return null;
-    const mark = this.push("stairs_end", sectionSteps);
+    const sectionSteps =
+      cumulativeSteps === null ? null : Math.max(0, cumulativeSteps - this.lastCumulativeSteps);
+    const mark = this.push("stairs_end", cumulativeSteps, sectionSteps);
     if (mark) {
+      if (cumulativeSteps !== null) {
+        this.lastCumulativeSteps = cumulativeSteps;
+      }
       this.sectionIndex += 1;
       this.sectionKind = "path";
     }
@@ -139,7 +161,7 @@ class CalibrationRecorder {
   // Stützstelle alle 50 Stufen innerhalb eines Treppenabschnitts.
   addStepMarker(stepsPerMarker = 50): CalibrationMark | null {
     this.markerSteps += stepsPerMarker;
-    const mark = this.push("step_marker", null);
+    const mark = this.push("step_marker", this.markerSteps, null);
     if (!mark) {
       this.markerSteps -= stepsPerMarker;
     }
@@ -154,18 +176,22 @@ class CalibrationRecorder {
     } else {
       this.sectionIndex = mark.sectionIndex;
       this.sectionKind = mark.sectionKind;
+      if (mark.kind === "stairs_end" && mark.cumulativeSteps !== null) {
+        // Zaehlerstand auf den Wert davor zuruecksetzen.
+        this.lastCumulativeSteps = mark.cumulativeSteps - (mark.sectionSteps ?? 0);
+      }
     }
   }
 
   marksCsv(): string {
     const header = [
       "mark_index", "timestamp_ms", "kind",
-      "section_index", "section_kind", "section_steps", "marker_steps",
+      "section_index", "section_kind", "cumulative_steps", "section_steps", "marker_steps",
       "lat", "lng", "altitude_m", "accuracy_m", "walk_id"
     ].join(",");
     const rows = this.marks.map((mark) => [
       mark.index, mark.atMs, mark.kind,
-      mark.sectionIndex, mark.sectionKind, mark.sectionSteps, mark.markerSteps,
+      mark.sectionIndex, mark.sectionKind, mark.cumulativeSteps, mark.sectionSteps, mark.markerSteps,
       mark.lat, mark.lng, mark.altitudeM, mark.accuracyM, this.walkId
     ].map(csvValue).join(","));
     return `${header}\n${rows.join("\n")}\n`;
