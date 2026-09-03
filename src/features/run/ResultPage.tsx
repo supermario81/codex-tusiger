@@ -1,4 +1,4 @@
-import { Download, Flag, LocateFixed, Map, Mountain, Share2, ShieldCheck, Timer } from "lucide-react";
+import { Activity, Download, Flag, LocateFixed, Map, Mountain, Share2, ShieldCheck, Timer } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
@@ -9,6 +9,7 @@ import { MetricCard } from "../../components/ui/MetricCard";
 import { ValidationBadge } from "../../components/ui/StatusBadge";
 import { formatDuration, formatPace } from "../../lib/geo/geo";
 import { localStore } from "../../lib/storage/localStore";
+import { sensorLog } from "../../lib/debug/sensorLog";
 
 function checkVerdictLabel(level: "pass" | "review" | "fail") {
   return level === "pass" ? "erfüllt" : level === "review" ? "Prüfung" : "nicht erfüllt";
@@ -21,9 +22,11 @@ export function ResultPage() {
     () => runId ? localStore.readRuns().find((item) => item.id === runId) ?? null : null,
     [runId]
   );
-  // Lokale Kopie bevorzugen: sie enthält Punkte und Checks, die Supabase-Zeile nicht.
+  // Die vollständigere Quelle gewinnt: die lokale Kopie hat Punkte und
+  // Prüfdetails, die Supabase-Zeile nur die Kennzahlen (bis Migration 0009).
   const contextRun = runs.find((item) => item.id === runId);
-  const run = storedRun && storedRun.points.length > 0 ? storedRun : contextRun ?? storedRun;
+  const localHasDetail = Boolean(storedRun && (storedRun.points.length > 0 || storedRun.validationChecks?.length));
+  const run = localHasDetail ? storedRun : contextRun ?? storedRun;
 
   if (!run) {
     return (
@@ -36,9 +39,28 @@ export function ResultPage() {
   const selectedRun = run;
   const validationLabel =
     selectedRun.status === "valid" ? "Validiert" : selectedRun.status === "invalid" ? "Ungültig" : "Prüfung";
+  const hasSensorLog = sensorLog.hasDataFor(selectedRun.id);
   const confidenceText = selectedRun.trackingSummary
     ? `${Math.round(selectedRun.trackingSummary.averageConfidence * 100)} % · ${Math.round(selectedRun.trackingSummary.routeAdherenceRatio * 100)} % Korridor`
     : "nicht verfügbar";
+
+  function downloadFile(content: string, fileName: string, type: string) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportSensorCsv() {
+    downloadFile(sensorLog.toCsv(), `tusiger-sensors-${selectedRun.id}.csv`, "text/csv");
+  }
+
+  function exportLabelsCsv() {
+    downloadFile(sensorLog.toLabelsCsv(), `tusiger-labels-${selectedRun.id}.csv`, "text/csv");
+  }
 
   function exportJson() {
     // Diagnose-Export für Feldtests: kompletter Lauf inkl. aller Punkte,
@@ -116,6 +138,16 @@ export function ResultPage() {
         <Link to="/leaderboard"><Button>In Rangliste ansehen</Button></Link>
         <Button variant="secondary" icon={<Share2 />}>Bericht teilen</Button>
         <Button variant="glass" icon={<Download />} onClick={exportJson}>JSON exportieren</Button>
+        {hasSensorLog ? (
+          <>
+            <Button variant="glass" icon={<Activity />} onClick={exportSensorCsv}>
+              Sensordaten als CSV ({sensorLog.sampleCount} Messungen)
+            </Button>
+            <Button variant="glass" icon={<Download />} onClick={exportLabelsCsv}>
+              Label-Vorlage als CSV
+            </Button>
+          </>
+        ) : null}
       </section>
     </PageShell>
   );

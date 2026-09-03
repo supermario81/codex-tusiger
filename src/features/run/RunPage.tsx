@@ -14,6 +14,7 @@ import { localStore } from "../../lib/storage/localStore";
 import type { RouteTrackSummary, RunPoint, RunRecord } from "../../lib/types";
 import { validateRun } from "../../lib/validation/validateRun";
 import { appendRunPoint, positionToRunPoint } from "./runUtils";
+import { isSensorLogEnabled, sensorLog } from "../../lib/debug/sensorLog";
 
 function compactTrackingSummary(summary: RouteTrackSummary, telemetryLimit = 160): RouteTrackSummary {
   if (summary.telemetry.length <= telemetryLimit) {
@@ -43,6 +44,7 @@ export function RunPage() {
   const lastPersistedAt = useRef(0);
   const lastLoggedPointCount = useRef(0);
   const stableStartFrozen = useRef<RunPoint | null>(null);
+  const runIdRef = useRef<string>(crypto.randomUUID());
   const tracking = useMemo(() => analyzeRouteTrack(fullPoints, config), [config, fullPoints]);
 
   // Stabile Start-Referenz: einmal berechnet (Median der ersten guten Punkte),
@@ -63,6 +65,14 @@ export function RunPage() {
     return stableStartFrozen.current;
   }, [fullPoints]);
 
+  // Der GPS-Callback braucht den zuletzt berechneten Zustand fuer den Logger.
+  const trackingRef = useRef({ stageIndex: 0, steps: 0, distanceM: 0 });
+  trackingRef.current = {
+    stageIndex: tracking.telemetry.at(-1)?.segmentIndex ?? 0,
+    steps: tracking.finalSteps,
+    distanceM: tracking.projectedDistanceMeters
+  };
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       setElapsed((Date.now() - new Date(startedAt).getTime()) / 1000);
@@ -78,6 +88,15 @@ export function RunPage() {
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, []);
 
+  // Sensor-Logger laeuft nur, wenn er in den Einstellungen aktiviert wurde.
+  useEffect(() => {
+    if (!isSensorLogEnabled()) {
+      return;
+    }
+    sensorLog.start(runIdRef.current, config.id, new Date(startedAt).getTime());
+    return () => sensorLog.stop();
+  }, [config.id, startedAt]);
+
   useEffect(() => {
     if (!navigator.geolocation) {
       debugRunEvent("geolocation_unavailable");
@@ -87,6 +106,11 @@ export function RunPage() {
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const point = positionToRunPoint(position);
+        sensorLog.recordGps(point, {
+          stageIndex: trackingRef.current.stageIndex,
+          computedSteps: trackingRef.current.steps,
+          computedDistanceM: Math.round(trackingRef.current.distanceM * 10) / 10
+        });
         setFullPoints((current) => {
           const next = appendRunPoint(current, point);
           const shouldLog =
@@ -217,7 +241,7 @@ export function RunPage() {
     const forceReview = localStorage.getItem("tusiger.forceReview") === "true";
     const status = forceReview && validation.status === "valid" ? "needs_review" : validation.status;
     const run: RunRecord = {
-      id: crypto.randomUUID(),
+      id: runIdRef.current,
       userId,
       startedAt,
       endedAt: finishedAt,
@@ -254,6 +278,8 @@ export function RunPage() {
       score: validation.score,
       reasons: validation.reasons
     });
+
+    sensorLog.stop();
 
     try {
       await saveRun(run);

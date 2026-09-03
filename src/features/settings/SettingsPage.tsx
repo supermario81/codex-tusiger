@@ -1,15 +1,37 @@
-import { Trash2 } from "lucide-react";
+import { Activity, Trash2 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
+import { isSensorLogEnabled, requestMotionPermission, setSensorLogEnabled } from "../../lib/debug/sensorLog";
 
 export function SettingsPage() {
   const { deleteAccount } = useApp();
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
+  const [sensorLogging, setSensorLogging] = useState(() => isSensorLogEnabled());
+  const [sensorNote, setSensorNote] = useState("");
+
+  // Der Schalter fragt die iOS-Bewegungsfreigabe direkt aus dem Tap heraus an —
+  // Safari erlaubt das nur innerhalb einer Nutzergeste.
+  async function toggleSensorLogging(nextValue: boolean) {
+    setSensorNote("");
+    if (!nextValue) {
+      setSensorLogEnabled(false);
+      setSensorLogging(false);
+      return;
+    }
+    const granted = await requestMotionPermission();
+    setSensorLogEnabled(granted);
+    setSensorLogging(granted);
+    setSensorNote(
+      granted
+        ? "Sensor-Aufzeichnung aktiv. Der Export erscheint nach dem Lauf im Laufbericht."
+        : "Bewegungsdaten wurden nicht freigegeben. In den Safari-Einstellungen erlauben."
+    );
+  }
 
   async function submitDelete(event: FormEvent) {
     event.preventDefault();
@@ -34,6 +56,23 @@ export function SettingsPage() {
             <Link to="/legal/impressum">Impressum</Link>
             <Link to="/legal/standort-sensoren">Standort-/Sensor-Einwilligung</Link>
           </div>
+        </GlassPanel>
+        <GlassPanel>
+          <h2>Entwickler-Werkzeuge</h2>
+          <p>
+            Zeichnet während eines Laufs die verfügbaren Gerätesensoren auf (Beschleunigung,
+            Gyroskop, Kompass, GPS) und stellt sie im Laufbericht als CSV zum Export bereit.
+            Nur für Testläufe gedacht — im Normalbetrieb ausgeschaltet lassen.
+          </p>
+          <label className="toggle-line">
+            <span><strong><Activity size={18} aria-hidden /> Sensordaten aufzeichnen</strong></span>
+            <input
+              type="checkbox"
+              checked={sensorLogging}
+              onChange={(event) => void toggleSensorLogging(event.currentTarget.checked)}
+            />
+          </label>
+          {sensorNote ? <small>{sensorNote}</small> : null}
         </GlassPanel>
         <GlassPanel>
           <h2>Account löschen</h2>
