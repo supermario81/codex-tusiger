@@ -140,6 +140,27 @@ export function ResultPage() {
         <Button variant="glass" icon={<Download />} onClick={exportJson}>JSON exportieren</Button>
         {hasSensorLog ? (
           <>
+            <GlassPanel className="details-list">
+              <h2>Sensor-Vergleich</h2>
+              <p>
+                <Activity /> Stufen laut GPS und Routenmodell
+                <span>{selectedRun.estimatedSteps}</span>
+              </p>
+              <p>
+                <Activity /> Schritte laut Beschleunigung
+                <span>{sensorLog.detectedStepCount}</span>
+              </p>
+              <p className="check-row">
+                <Activity />
+                <span className="check-text">
+                  <strong>Noch kein Wertungskriterium</strong>
+                  <small>
+                    Der Beschleunigungssensor zählt jeden Schritt, auch auf den stufenlosen
+                    Verbindungswegen. Die Zahl liegt deshalb erwartungsgemäß über der Stufenzahl.
+                  </small>
+                </span>
+              </p>
+            </GlassPanel>
             <Button variant="glass" icon={<Activity />} onClick={exportSensorCsv}>
               Sensordaten als CSV ({sensorLog.sampleCount} Messungen)
             </Button>

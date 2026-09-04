@@ -23,7 +23,7 @@ describe("Sensor-Logger CSV", () => {
       "timestamp_ms,acc_x,acc_y,acc_z,lin_acc_x,lin_acc_y,lin_acc_z,gyro_x,gyro_y,gyro_z," +
       "mag_x,mag_y,mag_z,pressure_hPa,altitude_m," +
       "gps_lat,gps_lon,gps_alt,gps_speed,gps_heading,gps_accuracy,gps_provider," +
-      "step_detector,step_counter,stage_index,computed_steps,computed_distance_m,run_id,challenge_id"
+      "step_detector,step_counter,stage_index,computed_steps,computed_distance_m,detected_steps,run_id,challenge_id"
     );
   });
 

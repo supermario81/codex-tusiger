@@ -19,12 +19,23 @@ def hav(a, b):
     h = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
     return 2 * R * math.asin(math.sqrt(h))
 
+# GEPRUEFT UND VERWORFEN: Die Beschleunigungsmessung legte nahe, die Grenze bei
+# Zaehlerstand 663 auf 613 zu korrigieren - beide Geraete zaehlten im Abschnitt
+# davor rund 50 Stufen weniger und danach 50 mehr. Der Test gegen den
+# unabhaengigen Lauf vom 2026-07-14 mit fotografierten 100er-Marken hat das
+# widerlegt: der Fehler stieg von 23 auf 59 Stufen. Nicht die eingetragene Zahl
+# ist falsch, sondern der Zeitpunkt des Tippens - eine wenige Schritte zu frueh
+# gesetzte Grenze verschiebt die Stufen ins naechste Zeitfenster. Die
+# Gesamtsumme des Detektors stimmte dagegen exakt (1150 bzw. 1153 bei real 1150).
+STEP_COUNT_FIXES = {}
+
 def load_marks(path):
     out = []
     for r in csv.DictReader(open(path)):
         out.append({
             "kind": r["kind"],
-            "cum": int(r["cumulative_steps"]) if r["cumulative_steps"] else None,
+            "cum": STEP_COUNT_FIXES.get(int(r["cumulative_steps"]), int(r["cumulative_steps"]))
+                   if r["cumulative_steps"] else None,
             "sec": int(r["section_steps"]) if r["section_steps"] else None,
             "ms": int(r["timestamp_ms"]),
             "lat": float(r["lat"]), "lng": float(r["lng"]),

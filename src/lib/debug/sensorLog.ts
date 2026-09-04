@@ -1,4 +1,5 @@
 import { appVersion } from "../appVersion";
+import { AccelerationStepDetector } from "../fusion/stepDetector";
 
 // Sensor-Logger fuer Feldtests. Zeichnet waehrend eines Laufs die verfuegbaren
 // Sensoren auf und gibt sie am Ende als CSV aus, damit die Sensorfusion mit
@@ -50,6 +51,9 @@ export type SensorSample = {
   stageIndex: number | null;
   computedSteps: number | null;
   computedDistanceM: number | null;
+  // Schattenbetrieb: Schritte aus der Beschleunigung. Steuert nichts, wird nur
+  // mitgeschrieben, damit sich beide Verfahren am selben Lauf vergleichen lassen.
+  detectedSteps: number | null;
 };
 
 export function isSensorLogEnabled(): boolean {
@@ -103,6 +107,7 @@ class SensorLogger {
   private lastMotionAt = 0;
   private latestMotion: Partial<SensorSample> = {};
   private latestHeading: number | null = null;
+  private stepDetector = new AccelerationStepDetector();
   private motionHandler: ((event: DeviceMotionEvent) => void) | null = null;
   private orientationHandler: ((event: DeviceOrientationEvent) => void) | null = null;
   private genericSensors: Array<{ stop: () => void }> = [];
@@ -113,6 +118,11 @@ class SensorLogger {
 
   get sampleCount(): number {
     return this.samples.length;
+  }
+
+  // Schattenzaehler aus der Beschleunigung, nur zur Anzeige im Bericht.
+  get detectedStepCount(): number {
+    return this.stepDetector.stepCount;
   }
 
   get loggedRunId(): string {
@@ -130,9 +140,16 @@ class SensorLogger {
     this.challengeId = challengeId;
     this.startedAtMs = startedAtMs;
     this.recording = true;
+    this.stepDetector.reset();
 
     this.motionHandler = (event: DeviceMotionEvent) => {
       const now = Date.now();
+      const gravity = event.accelerationIncludingGravity;
+      if (gravity) {
+        // Der Detektor bekommt JEDE Messung, nicht nur die protokollierten —
+        // die Drosselung auf 10 Hz betrifft nur die Dateigroesse.
+        this.stepDetector.push(now, gravity.x ?? 0, gravity.y ?? 0, gravity.z ?? 0);
+      }
       this.latestMotion = {
         accX: event.accelerationIncludingGravity?.x ?? null,
         accY: event.accelerationIncludingGravity?.y ?? null,
@@ -275,6 +292,7 @@ class SensorLogger {
       gpsProvider: "",
       stepDetector: null, stepCounter: null,
       stageIndex: null, computedSteps: null, computedDistanceM: null,
+      detectedSteps: this.stepDetector.stepCount,
       ...this.latestMotion,
       ...extra
     });
@@ -292,6 +310,7 @@ class SensorLogger {
       "gps_lat", "gps_lon", "gps_alt", "gps_speed", "gps_heading", "gps_accuracy", "gps_provider",
       "step_detector", "step_counter",
       "stage_index", "computed_steps", "computed_distance_m",
+      "detected_steps",
       "run_id", "challenge_id"
     ].join(",");
 
@@ -312,6 +331,7 @@ class SensorLogger {
       sample.gpsLat, sample.gpsLon, sample.gpsAlt, sample.gpsSpeed, sample.gpsHeading, sample.gpsAccuracy, sample.gpsProvider,
       sample.stepDetector, sample.stepCounter,
       sample.stageIndex, sample.computedSteps, sample.computedDistanceM,
+      sample.detectedSteps,
       this.runId, this.challengeId
     ].map(csvValue).join(","));
 
