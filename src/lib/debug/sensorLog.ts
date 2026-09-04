@@ -1,5 +1,6 @@
 import { appVersion } from "../appVersion";
 import { AccelerationStepDetector } from "../fusion/stepDetector";
+import { stairsPerFootfallAt } from "../../data/challenge";
 
 // Sensor-Logger fuer Feldtests. Zeichnet waehrend eines Laufs die verfuegbaren
 // Sensoren auf und gibt sie am Ende als CSV aus, damit die Sensorfusion mit
@@ -54,6 +55,9 @@ export type SensorSample = {
   // Schattenbetrieb: Schritte aus der Beschleunigung. Steuert nichts, wird nur
   // mitgeschrieben, damit sich beide Verfahren am selben Lauf vergleichen lassen.
   detectedSteps: number | null;
+  // Tritte mal dem Abschnittsfaktor aus dem Routenmodell — die eigentliche
+  // Fusion. Auf stufenlosen Wegen ist der Faktor 0, dort waechst der Wert nicht.
+  fusedSteps: number | null;
 };
 
 export function isSensorLogEnabled(): boolean {
@@ -108,6 +112,11 @@ class SensorLogger {
   private latestMotion: Partial<SensorSample> = {};
   private latestHeading: number | null = null;
   private stepDetector = new AccelerationStepDetector();
+  private lastFootfalls = 0;
+  private fusedSteps = 0;
+  // Zuletzt bekannter Streckenfortschritt aus GPS und Routenmodell. Er waehlt
+  // nur den Abschnitt aus; die Stufen selbst kommen aus den Tritten.
+  private routeSteps = 0;
   private motionHandler: ((event: DeviceMotionEvent) => void) | null = null;
   private orientationHandler: ((event: DeviceOrientationEvent) => void) | null = null;
   private genericSensors: Array<{ stop: () => void }> = [];
@@ -123,6 +132,11 @@ class SensorLogger {
   // Schattenzaehler aus der Beschleunigung, nur zur Anzeige im Bericht.
   get detectedStepCount(): number {
     return this.stepDetector.stepCount;
+  }
+
+  // Tritte mal Abschnittsfaktor: die fusionierte Stufenzahl.
+  get fusedStepCount(): number {
+    return Math.round(this.fusedSteps);
   }
 
   get loggedRunId(): string {
@@ -141,6 +155,9 @@ class SensorLogger {
     this.startedAtMs = startedAtMs;
     this.recording = true;
     this.stepDetector.reset();
+    this.lastFootfalls = 0;
+    this.fusedSteps = 0;
+    this.routeSteps = 0;
 
     this.motionHandler = (event: DeviceMotionEvent) => {
       const now = Date.now();
@@ -148,7 +165,12 @@ class SensorLogger {
       if (gravity) {
         // Der Detektor bekommt JEDE Messung, nicht nur die protokollierten —
         // die Drosselung auf 10 Hz betrifft nur die Dateigroesse.
-        this.stepDetector.push(now, gravity.x ?? 0, gravity.y ?? 0, gravity.z ?? 0);
+        const footfalls = this.stepDetector.push(now, gravity.x ?? 0, gravity.y ?? 0, gravity.z ?? 0);
+        const added = footfalls - this.lastFootfalls;
+        if (added > 0) {
+          this.lastFootfalls = footfalls;
+          this.fusedSteps += added * stairsPerFootfallAt(this.routeSteps);
+        }
       }
       this.latestMotion = {
         accX: event.accelerationIncludingGravity?.x ?? null,
@@ -273,6 +295,9 @@ class SensorLogger {
       gpsProvider: position.accuracyM <= 25 ? "gps" : "network",
       ...state
     });
+    if (state.computedSteps !== null) {
+      this.routeSteps = state.computedSteps;
+    }
   }
 
   private push(timestampMs: number, extra: Partial<SensorSample>): void {
@@ -293,6 +318,7 @@ class SensorLogger {
       stepDetector: null, stepCounter: null,
       stageIndex: null, computedSteps: null, computedDistanceM: null,
       detectedSteps: this.stepDetector.stepCount,
+      fusedSteps: Math.round(this.fusedSteps),
       ...this.latestMotion,
       ...extra
     });
@@ -310,7 +336,7 @@ class SensorLogger {
       "gps_lat", "gps_lon", "gps_alt", "gps_speed", "gps_heading", "gps_accuracy", "gps_provider",
       "step_detector", "step_counter",
       "stage_index", "computed_steps", "computed_distance_m",
-      "detected_steps",
+      "detected_steps", "fused_steps",
       "run_id", "challenge_id"
     ].join(",");
 
@@ -331,7 +357,7 @@ class SensorLogger {
       sample.gpsLat, sample.gpsLon, sample.gpsAlt, sample.gpsSpeed, sample.gpsHeading, sample.gpsAccuracy, sample.gpsProvider,
       sample.stepDetector, sample.stepCounter,
       sample.stageIndex, sample.computedSteps, sample.computedDistanceM,
-      sample.detectedSteps,
+      sample.detectedSteps, sample.fusedSteps,
       this.runId, this.challengeId
     ].map(csvValue).join(","));
 

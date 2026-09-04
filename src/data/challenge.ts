@@ -186,6 +186,67 @@ export interface RouteWaypoint {
 // von der Route.
 export const routeModelVersion = 3;
 
+// Abschnittsstruktur der Strecke.
+//
+// Der Beschleunigungssensor zaehlt Tritte, nicht Stufen. Auf stufenlosen Wegen
+// duerfen Tritte deshalb keine Stufen erzeugen — das ist gesichert und steht
+// hier als Faktor 0.
+//
+// Auf Treppenabschnitten steht bewusst ueberall 1,0, obwohl der Kalibriergang
+// vom 2026-09-04 auf beiden Geraeten zwei Abweichungen zeigte: 1,35 Stufen pro
+// Tritt auf dem Abschnitt mit 195 Stufen und 0,90 auf dem mit 487. Beide
+// Erklaerungsversuche wurden geprueft und verworfen:
+//   - "zwei Stufen auf einmal": der Laeufer nimmt jede Stufe einzeln
+//   - "Detektor zu unempfindlich": ein adaptiver Schwellwert findet dort noch
+//     weniger Tritte (126 statt 195), egal bei welcher Einstellung
+// Solange die Ursache unbekannt ist, wird kein Faktor eingebaut. Eine
+// unerklaerte Zahl als gemessene Konstante zu setzen wuerde das Modell auf ein
+// Artefakt eichen. Zu klaeren mit den naechsten normalen Laeufen.
+export type RouteSection = {
+  kind: "stairs" | "path";
+  fromSteps: number;
+  toSteps: number;
+  /** Gemessen; null, wo der Abschnitt zu kurz fuer eine Aussage ist. */
+  stairsPerFootfall: number | null;
+};
+
+export const routeSections: RouteSection[] = [
+  { kind: "stairs", fromSteps: 0, toSteps: 245, stairsPerFootfall: 1.0 },
+  { kind: "path", fromSteps: 245, toSteps: 245, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 245, toSteps: 264, stairsPerFootfall: null },
+  { kind: "path", fromSteps: 264, toSteps: 264, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 264, toSteps: 361, stairsPerFootfall: 1.0 },
+  { kind: "path", fromSteps: 361, toSteps: 361, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 361, toSteps: 368, stairsPerFootfall: null },
+  { kind: "path", fromSteps: 368, toSteps: 368, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 368, toSteps: 468, stairsPerFootfall: 1.0 },
+  { kind: "path", fromSteps: 468, toSteps: 468, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 468, toSteps: 663, stairsPerFootfall: null },
+  { kind: "path", fromSteps: 663, toSteps: 663, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 663, toSteps: 1150, stairsPerFootfall: null }
+];
+
+/** Mittleres Verhaeltnis der Abschnitte, die lang genug fuer eine Aussage sind. */
+const defaultStairsPerFootfall = 1.0;
+
+/**
+ * Liefert das Verhaeltnis Stufen pro Tritt an der aktuellen Position der Route.
+ * Auf stufenlosen Wegen ist es 0 — dort erhoehen Tritte die Stufenzahl nicht.
+ */
+export function stairsPerFootfallAt(steps: number): number {
+  const section = routeSections.find(
+    (item) => steps >= item.fromSteps && steps <= item.toSteps && !(item.kind === "path" && steps !== item.fromSteps)
+  );
+  if (!section) {
+    return defaultStairsPerFootfall;
+  }
+  if (section.kind === "path") {
+    return 0;
+  }
+  return section.stairsPerFootfall ?? defaultStairsPerFootfall;
+}
+
+
 export const routeWaypoints: RouteWaypoint[] = [
   { steps: 0, lat: 47.315238, lng: 7.886964, altM: 425.3 },
   { steps: 15, lat: 47.315291, lng: 7.886943, altM: 424.2 },

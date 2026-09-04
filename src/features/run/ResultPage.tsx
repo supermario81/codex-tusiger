@@ -147,16 +147,22 @@ export function ResultPage() {
                 <span>{selectedRun.estimatedSteps}</span>
               </p>
               <p>
-                <Activity /> Schritte laut Beschleunigung
+                <Activity /> Tritte laut Beschleunigung
                 <span>{sensorLog.detectedStepCount}</span>
+              </p>
+              <p>
+                <Activity /> Stufen aus Tritten und Routenmodell
+                <span>{sensorLog.fusedStepCount}</span>
               </p>
               <p className="check-row">
                 <Activity />
                 <span className="check-text">
                   <strong>Noch kein Wertungskriterium</strong>
                   <small>
-                    Der Beschleunigungssensor zählt jeden Schritt, auch auf den stufenlosen
-                    Verbindungswegen. Die Zahl liegt deshalb erwartungsgemäß über der Stufenzahl.
+                    Der Sensor zählt Tritte, nicht Stufen — auf stufenlosen Wegen und je nach
+                    Steilheit weicht beides ab. Die dritte Zeile rechnet die Tritte mit dem
+                    gemessenen Faktor je Abschnitt um. Sie läuft mit, bis normale Läufe die
+                    Faktoren bestätigen.
                   </small>
                 </span>
               </p>
