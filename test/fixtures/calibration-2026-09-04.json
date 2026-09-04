@@ -1,0 +1,182 @@
+{
+  "source": "Kalibriergang 2026-09-04, iPhone Safari + Huawei Chrome, Positionen gemittelt",
+  "totalSteps": 1150,
+  "sections": [
+    {
+      "start": {
+        "lat": 47.315238,
+        "lng": 7.886964
+      },
+      "stepsAtStart": 0,
+      "end": {
+        "lat": 47.31592,
+        "lng": 7.886201
+      },
+      "kind": "stairs",
+      "steps": 245,
+      "stepsAtEnd": 245
+    },
+    {
+      "start": {
+        "lat": 47.31592,
+        "lng": 7.886201
+      },
+      "stepsAtStart": 245,
+      "end": {
+        "lat": 47.315956,
+        "lng": 7.886184
+      },
+      "kind": "path",
+      "steps": 0
+    },
+    {
+      "start": {
+        "lat": 47.315956,
+        "lng": 7.886184
+      },
+      "stepsAtStart": 245,
+      "end": {
+        "lat": 47.315993,
+        "lng": 7.886128
+      },
+      "kind": "stairs",
+      "steps": 19,
+      "stepsAtEnd": 264
+    },
+    {
+      "start": {
+        "lat": 47.315993,
+        "lng": 7.886128
+      },
+      "stepsAtStart": 264,
+      "end": {
+        "lat": 47.316017,
+        "lng": 7.886104
+      },
+      "kind": "path",
+      "steps": 0
+    },
+    {
+      "start": {
+        "lat": 47.316017,
+        "lng": 7.886104
+      },
+      "stepsAtStart": 264,
+      "end": {
+        "lat": 47.31638,
+        "lng": 7.885688
+      },
+      "kind": "stairs",
+      "steps": 97,
+      "stepsAtEnd": 361
+    },
+    {
+      "start": {
+        "lat": 47.31638,
+        "lng": 7.885688
+      },
+      "stepsAtStart": 361,
+      "end": {
+        "lat": 47.316589,
+        "lng": 7.885501
+      },
+      "kind": "path",
+      "steps": 0
+    },
+    {
+      "start": {
+        "lat": 47.316589,
+        "lng": 7.885501
+      },
+      "stepsAtStart": 361,
+      "end": {
+        "lat": 47.316623,
+        "lng": 7.885492
+      },
+      "kind": "stairs",
+      "steps": 7,
+      "stepsAtEnd": 368
+    },
+    {
+      "start": {
+        "lat": 47.316623,
+        "lng": 7.885492
+      },
+      "stepsAtStart": 368,
+      "end": {
+        "lat": 47.316689,
+        "lng": 7.885408
+      },
+      "kind": "path",
+      "steps": 0
+    },
+    {
+      "start": {
+        "lat": 47.316689,
+        "lng": 7.885408
+      },
+      "stepsAtStart": 368,
+      "end": {
+        "lat": 47.317033,
+        "lng": 7.884987
+      },
+      "kind": "stairs",
+      "steps": 100,
+      "stepsAtEnd": 468
+    },
+    {
+      "start": {
+        "lat": 47.317033,
+        "lng": 7.884987
+      },
+      "stepsAtStart": 468,
+      "end": {
+        "lat": 47.317057,
+        "lng": 7.88496
+      },
+      "kind": "path",
+      "steps": 0
+    },
+    {
+      "start": {
+        "lat": 47.317057,
+        "lng": 7.88496
+      },
+      "stepsAtStart": 468,
+      "end": {
+        "lat": 47.317555,
+        "lng": 7.884431
+      },
+      "kind": "stairs",
+      "steps": 195,
+      "stepsAtEnd": 663
+    },
+    {
+      "start": {
+        "lat": 47.317555,
+        "lng": 7.884431
+      },
+      "stepsAtStart": 663,
+      "end": {
+        "lat": 47.317593,
+        "lng": 7.884401
+      },
+      "kind": "path",
+      "steps": 0
+    },
+    {
+      "start": {
+        "lat": 47.317593,
+        "lng": 7.884401
+      },
+      "stepsAtStart": 663,
+      "end": {
+        "lat": 47.319,
+        "lng": 7.882818
+      },
+      "kind": "stairs",
+      "steps": 487,
+      "stepsAtEnd": 1150
+    }
+  ]
+}
