@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { routeSections } from "../../data/challenge";
 import { AccelerationStepDetector } from "./stepDetector";
 
 // Betrag der Beschleunigung aus dem Kalibriergang vom 2026-09-04, beide Geräte
@@ -33,18 +34,29 @@ describe.each(["android", "iphone"])("Schritterkennung auf echten Daten (%s)", (
     expect(Math.abs(total - fixture.totalSteps) / fixture.totalSteps).toBeLessThan(0.03);
   });
 
-  it("trifft die Abschnitte mit verlässlicher Zeitgrenze auf wenige Stufen genau", () => {
-    // Der Abschnitt mit 195 Stufen und der darauffolgende mit 487 sind
-    // ausgenommen: dort wurde die Grenze ein paar Schritte zu früh getippt,
-    // wodurch rund 50 Stufen ins nächste Zeitfenster rutschen. Der unabhängige
-    // Lauf vom 2026-07-14 bestätigt, dass die eingetragenen Zahlen stimmen —
-    // nur der Zeitpunkt der Markierung war ungenau.
-    const reliable = sections.filter(([, , realSteps]) => realSteps !== 195 && realSteps !== 487);
-    expect(reliable).toHaveLength(5);
+  it("trifft jeden ausreichend langen Abschnitt auf wenige Stufen genau", () => {
+    // Gemessen wird gegen die Abschnittsgrößen aus Routenmodell v4, nicht
+    // gegen die im Kalibriergang eingetippten Zahlen. Genau hier lag der lange
+    // ungeklärte Widerspruch: Mit den alten Größen 195 und 487 zählte der
+    // Detektor auf beiden Geräten 1,37 bzw. 0,91 Stufen pro Tritt. Mit den
+    // korrigierten Größen 143 und 539 liegt er auf beiden Geräten bei 1,00
+    // bis 1,01. Nicht der Detektor lag falsch, sondern die Abschnittsgrenze.
+    //
+    // Ausgenommen bleiben die beiden sehr kurzen Abschnitte (25 und 9 Stufen).
+    // Dort entscheidet die Reaktionszeit beim Tippen über ein Viertel des
+    // Ergebnisses — das misst nicht den Detektor, sondern den Daumen.
+    const stairs = routeSections.filter((section) => section.kind === "stairs");
+    expect(sections).toHaveLength(stairs.length);
 
-    reliable.forEach(([from, to, realSteps]) => {
+    const longEnough = stairs
+      .map((section, index) => [section.toSteps - section.fromSteps, index] as const)
+      .filter(([size]) => size >= 30);
+    expect(longEnough).toHaveLength(5);
+
+    longEnough.forEach(([realSteps, index]) => {
+      const [from, to] = sections[index];
       const counted = countIn(samples, from, to);
-      const tolerance = Math.max(4, realSteps * 0.1);
+      const tolerance = Math.max(5, realSteps * 0.05);
       expect(Math.abs(counted - realSteps)).toBeLessThanOrEqual(tolerance);
     });
   });

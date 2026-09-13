@@ -51,6 +51,26 @@ describe("classifyJumpEvents", () => {
     expect(classifyJumpEvents([sample(1, 0, 150, 400)]).physicalJumpEventCount).toBe(1);
   });
 
+  // Kurzer Ausschlag ueber 100 m, der sofort zurueckkommt: Mehrwegeempfang,
+  // kein Ortswechsel. Bisher kippte er als "physisch" einen makellosen Lauf
+  // in die Pruefung.
+  it("wertet einen 200-m-Ausschlag hin und zurueck binnen Sekunden nicht als physisch", () => {
+    const events = classifyJumpEvents([sample(1, 0, 200, 80), sample(3, 200, 0, 80)]);
+    expect(events.physicalJumpEventCount).toBe(0);
+    expect(events.routeRematchEventCount).toBe(1);
+  });
+
+  it("laesst die Ausnahme nur fuer kurze Ausschlaege gelten", () => {
+    // Vier Samples: ein Ausflug, kein Blip — auch wenn er zurueckkehrt.
+    const sustained = [sample(1, 0, 120, 80), sample(2, 120, 240, 80), sample(3, 240, 360, 80), sample(4, 360, 0, 80)];
+    expect(classifyJumpEvents(sustained).physicalJumpEventCount).toBe(1);
+    // Drei Samples, aber laenger als das Ereignisfenster unterwegs.
+    const long = [sample(1, 0, 200, 80), sample(5, 200, 200, 80), sample(7, 200, 0, 80)];
+    expect(classifyJumpEvents(long).physicalJumpEventCount).toBeGreaterThanOrEqual(1);
+    // Zwei Samples, aber das Geraet bleibt weg: Netto-Versatz ueber der Rauschgrenze.
+    expect(classifyJumpEvents([sample(1, 0, 200, 80), sample(2, 200, 160, 80)]).physicalJumpEventCount).toBe(1);
+  });
+
   it("meldet eine Einweg-Drift bei gutem Empfang weiterhin als physisch", () => {
     const events = classifyJumpEvents([sample(1, 0, 44, 10), sample(2, 44, 88, 10)]);
     expect(events.physicalJumpEventCount).toBe(1);

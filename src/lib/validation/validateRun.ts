@@ -115,9 +115,18 @@ export function validateRun(
   const interpretedElevationReview =
     tracking.interpretedElevationGainM >= config.elevationReviewMinM &&
     tracking.interpretedElevationGainM <= config.elevationReviewMaxM;
+  // Eine gemeldete Hoehengenauigkeit ist nur so gut wie das Geraet, das sie
+  // meldet. Der Android-Testlauf vom 2026-09-08 behauptete durchgehend +/-3 m
+  // und lag am Ende 65 m weiter vom Routenprofil entfernt als am Start. Die
+  // Drift ist messbar, die Luege nicht — deshalb gilt die Geraete-Hoehe nur
+  // dann als verlaesslich, wenn beides stimmt.
+  const altitudeDriftMaxM = 20;
+  const altitudeSelfConsistent =
+    tracking.altitudeDriftM === null || Math.abs(tracking.altitudeDriftM) <= altitudeDriftMaxM;
   const edgeAltitudeReliable =
     (startPoint?.altitudeAccuracyM ?? Infinity) <= 35 &&
-    (endPoint?.altitudeAccuracyM ?? Infinity) <= 35;
+    (endPoint?.altitudeAccuracyM ?? Infinity) <= 35 &&
+    altitudeSelfConsistent;
   const strongCompletionEvidence =
     routeCompletionStrong &&
     (endZonePlausible || endRecoveredByRoute) &&
@@ -195,10 +204,13 @@ export function validateRun(
   }
 
   const ascentInfo = cumulativeAscentM === null ? "" : `, kumulativ ${Math.round(cumulativeAscentM)} m`;
+  const driftInfo = altitudeSelfConsistent
+    ? ""
+    : `; Geräte-Höhe driftet um ${Math.round(tracking.altitudeDriftM ?? 0)} m gegen das Routenprofil, Routenmodell ${Math.round(tracking.interpretedElevationGainM)} m`;
   const elevationMeasured =
     elevationGain === null
       ? `keine verwertbaren Höhendaten an Start/Ziel${ascentInfo} (Routenmodell ${Math.round(tracking.interpretedElevationGainM)} m)`
-      : `${Math.round(elevationGain)} m Anstieg Start→Ziel${ascentInfo} (gültig ${Math.round(config.elevationValidMinM)}–${Math.round(config.elevationValidMaxM)} m)`;
+      : `${Math.round(elevationGain)} m Anstieg Start→Ziel${ascentInfo}${driftInfo} (gültig ${Math.round(config.elevationValidMinM)}–${Math.round(config.elevationValidMaxM)} m)`;
   if (elevationGain === null) {
     if (interpretedElevationValid && strongCompletionEvidence) {
       record("elevation", "Höhenmeter", elevationMeasured, "pass", "Höhenprofil über Routenmodell plausibel.");
@@ -225,6 +237,11 @@ export function validateRun(
     record("elevation", "Höhenmeter", elevationMeasured, "pass", "GPS-Höhe war unruhig, Höhenprofil über Routenmodell plausibel.");
   } else if (interpretedElevationReview && routeCompletionStrong && endZonePlausible && !edgeAltitudeReliable) {
     record("elevation", "Höhenmeter", elevationMeasured, "review", "GPS-Höhe war unruhig, Routen-Höhenprofil bleibt plausibel.");
+  } else if (!altitudeSelfConsistent && interpretedElevationReview) {
+    // Ein Instrument, das nachweislich driftet, darf keinen harten Fehlschlag
+    // erzeugen. Der Routenfortschritt entscheidet dann — und der ist ueber
+    // den Korridor unabhaengig geprueft.
+    record("elevation", "Höhenmeter", elevationMeasured, "review", "Geräte-Höhe driftet und ist nicht verwertbar; das Routen-Höhenprofil liegt im Prüfbereich.");
   } else {
     record("elevation", "Höhenmeter", elevationMeasured, "fail", "Höhenprofil nicht plausibel.");
   }

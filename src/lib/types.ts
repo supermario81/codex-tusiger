@@ -90,6 +90,13 @@ export type RouteTrackSummary = {
   offRouteRatio: number;
   continuityScore: number;
   altitudeConsistencyRatio: number | null;
+  /**
+   * Wie weit die Geraete-Hoehe ueber den Lauf gegen das Routenprofil
+   * wegdriftet (Median der letzten minus Median der ersten Abweichungen).
+   * Ein GPS mit konstantem Versatz bleibt nahe 0; ein Geraet, dessen Hoehe
+   * hinterherhinkt, driftet um Dutzende Meter.
+   */
+  altitudeDriftM: number | null;
   filteredSpeedMps: number | null;
   rawSpeedMps: number | null;
   pacePer100Steps: number | null;

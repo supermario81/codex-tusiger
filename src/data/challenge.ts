@@ -164,44 +164,55 @@ export interface RouteWaypoint {
   altM: number;
 }
 
-// Routenmodell v3 (2026-09-04): vermessen im Kalibriergang vom 2026-09-04 mit
-// zwei Geräten gleichzeitig (iPhone Safari + Huawei Chrome). Die Strecke besteht
-// aus 7 Treppenabschnitten mit 245, 19, 97, 7, 100, 195 und 487 Stufen und
-// 6 stufenlosen Verbindungswegen dazwischen — zusammen 52,5 m der 532 m Route.
-// Genau dort vergab das Modell v2 rund 130 Phantom-Stufen, weil es die Stufen
-// gleichmäßig über die Strecke verteilte.
+// Routenmodell v4 (2026-09-08): abgeleitet aus dem Referenzlauf vom 2026-09-08.
+// Jenes iPhone lief die Strecke gueltig und vollstaendig durch und lieferte an
+// jeder 100er-Marke einen Screenshot, dessen Dateizeit die Laufsekunde verraet.
+// Das ergibt zwoelf exakte Paare aus Position und echtem Stufenstand — die
+// bisher belastbarste Grundlage, weil Stufenzahl und Ort aus derselben Quelle
+// stammen statt aus einem separaten Kalibriergang.
 //
-// Aufbau: Abschnittsgrenzen sind harte Anker (im Stehen bewusst eingetragen),
-// die 50er-Zwischenmarken sind weiche Stützstellen. Teilstrecken mit
-// physikalisch unmöglicher Stufendichte (> 3,5 Stufen/m — eine verspätet
-// getippte Marke) werden verworfen. Positionen sind der Mittelwert beider
-// Geräte, deren Fixes im Median 9,3 m auseinanderlagen; Höhen stammen vom
-// iPhone, weil Android eine ellipsoidische Höhe mit ~38 m Versatz liefert.
-// Stufenlose Abschnitte tragen an beiden Enden denselben Stufenwert, dadurch
-// steht der Zähler dort still.
+// Die Strecke besteht aus 7 Treppenabschnitten mit 240, 25, 97, 9, 97, 143 und
+// 539 Stufen und 6 stufenlosen Verbindungswegen dazwischen.
 //
-// Erzeugt mit scripts/build-route-model-v3.py. Verifiziert gegen den
-// unabhängigen Lauf vom 2026-07-14: max. 23 Stufen Abweichung an den zwölf
-// fotografierten 100er-Marken (Modell v2: 43), kein Punkt weiter als 10 m
-// von der Route.
-export const routeModelVersion = 3;
+// Was sich gegenueber v3 aendert: Die letzte Abschnittsgrenze wandert von
+// Zaehlerstand 663 auf 611. Im Kalibriergang war sie mit 663 eingetragen; das
+// verschob 52 Stufen vom letzten in den vorletzten Abschnitt. Sichtbar wurde
+// das im Referenzlauf als +27,6 Stufen an der Marke 600 — der einzige grobe
+// Ausreisser von v3. Alle fuenf uebrigen Grenzen bestaetigen v3 auf drei
+// Stufen genau.
+//
+// Aufbau: Die Hoehe stammt aus der parallel mitlaufenden Strava-Aufzeichnung
+// und ist barometrisch. Die GPS-Hoehe desselben Laufs sammelt ohne Schwelle
+// 74 m Phantom-Anstieg an, die barometrische ist praktisch rauschfrei (der
+// Aufstieg ist bei Schwelle 0 m und 2 m derselbe). Stufenlose Abschnitte
+// tragen an beiden Enden denselben Stufenwert und bekommen eigene
+// Stuetzpunkte, damit der Zaehler dort wirklich stillsteht.
+//
+// Erzeugt mit scripts/build-route-model-v4.py. Verifiziert gegen den
+// unabhaengigen Lauf vom 2026-07-14: mittlere Abweichung 4,2 Stufen an den
+// zwoelf fotografierten 100er-Marken, maximal 12,5 (Modell v3: 7,9 und 22,6).
+export const routeModelVersion = 4;
 
 // Abschnittsstruktur der Strecke.
 //
 // Der Beschleunigungssensor zaehlt Tritte, nicht Stufen. Auf stufenlosen Wegen
-// duerfen Tritte deshalb keine Stufen erzeugen — das ist gesichert und steht
-// hier als Faktor 0.
+// duerfen Tritte deshalb keine Stufen erzeugen — das steht hier als Faktor 0.
 //
-// Auf Treppenabschnitten steht bewusst ueberall 1,0, obwohl der Kalibriergang
-// vom 2026-09-04 auf beiden Geraeten zwei Abweichungen zeigte: 1,35 Stufen pro
-// Tritt auf dem Abschnitt mit 195 Stufen und 0,90 auf dem mit 487. Beide
-// Erklaerungsversuche wurden geprueft und verworfen:
-//   - "zwei Stufen auf einmal": der Laeufer nimmt jede Stufe einzeln
-//   - "Detektor zu unempfindlich": ein adaptiver Schwellwert findet dort noch
-//     weniger Tritte (126 statt 195), egal bei welcher Einstellung
-// Solange die Ursache unbekannt ist, wird kein Faktor eingebaut. Eine
-// unerklaerte Zahl als gemessene Konstante zu setzen wuerde das Modell auf ein
-// Artefakt eichen. Zu klaeren mit den naechsten normalen Laeufen.
+// Auf allen Treppenabschnitten, die lang genug fuer eine Aussage sind, steht
+// 1,0 — und das ist jetzt gemessen statt angenommen. Unter Modell v3 zeigten
+// zwei Abschnitte auf beiden Geraeten unerklaerte Abweichungen: 1,37 Stufen pro
+// Tritt auf dem Abschnitt mit angeblich 195 Stufen und 0,91 auf dem mit
+// angeblich 487. Mit den korrigierten Groessen 143 und 539 loesen sich beide
+// auf:
+//
+//   Abschnitt   Tritte iPhone   Tritte Android   Faktor v3      Faktor v4
+//   143 Stufen        142             143        1,37 / 1,36    1,007 / 1,000
+//   539 Stufen        535             536        0,91 / 0,91    1,007 / 1,006
+//
+// Der Schrittdetektor hatte also die ganze Zeit recht; falsch war die
+// Abschnittsgrenze. Zwei unabhaengige Messungen — die Beschleunigung des
+// Kalibriergangs und die fotografierten Zonengrenzen des Referenzlaufs —
+// kommen auf denselben Wert.
 export type RouteSection = {
   kind: "stairs" | "path";
   fromSteps: number;
@@ -211,19 +222,19 @@ export type RouteSection = {
 };
 
 export const routeSections: RouteSection[] = [
-  { kind: "stairs", fromSteps: 0, toSteps: 245, stairsPerFootfall: 1.0 },
-  { kind: "path", fromSteps: 245, toSteps: 245, stairsPerFootfall: 0 },
-  { kind: "stairs", fromSteps: 245, toSteps: 264, stairsPerFootfall: null },
-  { kind: "path", fromSteps: 264, toSteps: 264, stairsPerFootfall: 0 },
-  { kind: "stairs", fromSteps: 264, toSteps: 361, stairsPerFootfall: 1.0 },
-  { kind: "path", fromSteps: 361, toSteps: 361, stairsPerFootfall: 0 },
-  { kind: "stairs", fromSteps: 361, toSteps: 368, stairsPerFootfall: null },
-  { kind: "path", fromSteps: 368, toSteps: 368, stairsPerFootfall: 0 },
-  { kind: "stairs", fromSteps: 368, toSteps: 468, stairsPerFootfall: 1.0 },
+  { kind: "stairs", fromSteps: 0, toSteps: 240, stairsPerFootfall: 1.0 },
+  { kind: "path", fromSteps: 240, toSteps: 240, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 240, toSteps: 265, stairsPerFootfall: null },
+  { kind: "path", fromSteps: 265, toSteps: 265, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 265, toSteps: 362, stairsPerFootfall: 1.0 },
+  { kind: "path", fromSteps: 362, toSteps: 362, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 362, toSteps: 371, stairsPerFootfall: null },
+  { kind: "path", fromSteps: 371, toSteps: 371, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 371, toSteps: 468, stairsPerFootfall: 1.0 },
   { kind: "path", fromSteps: 468, toSteps: 468, stairsPerFootfall: 0 },
-  { kind: "stairs", fromSteps: 468, toSteps: 663, stairsPerFootfall: null },
-  { kind: "path", fromSteps: 663, toSteps: 663, stairsPerFootfall: 0 },
-  { kind: "stairs", fromSteps: 663, toSteps: 1150, stairsPerFootfall: null }
+  { kind: "stairs", fromSteps: 468, toSteps: 611, stairsPerFootfall: 1.0 },
+  { kind: "path", fromSteps: 611, toSteps: 611, stairsPerFootfall: 0 },
+  { kind: "stairs", fromSteps: 611, toSteps: 1150, stairsPerFootfall: 1.0 }
 ];
 
 /** Mittleres Verhaeltnis der Abschnitte, die lang genug fuer eine Aussage sind. */
@@ -234,91 +245,95 @@ const defaultStairsPerFootfall = 1.0;
  * Auf stufenlosen Wegen ist es 0 — dort erhoehen Tritte die Stufenzahl nicht.
  */
 export function stairsPerFootfallAt(steps: number): number {
-  const section = routeSections.find(
-    (item) => steps >= item.fromSteps && steps <= item.toSteps && !(item.kind === "path" && steps !== item.fromSteps)
-  );
-  if (!section) {
-    return defaultStairsPerFootfall;
-  }
-  if (section.kind === "path") {
+  // Ein stufenloser Weg belegt genau einen Stufenwert; wer darauf projiziert,
+  // steht auf dem Weg. Deshalb hat der Weg an seinem Wert Vorrang vor der
+  // Treppe, die dort endet — sonst faende die Suche zuerst die Treppe 0..240
+  // und meldete am Zonenwert 240 faelschlich Stufen.
+  const rounded = Math.round(steps);
+  if (routeSections.some((item) => item.kind === "path" && item.fromSteps === rounded)) {
     return 0;
   }
-  return section.stairsPerFootfall ?? defaultStairsPerFootfall;
+  const section = routeSections.find(
+    (item) => item.kind === "stairs" && steps >= item.fromSteps && steps <= item.toSteps
+  );
+  return section?.stairsPerFootfall ?? defaultStairsPerFootfall;
 }
 
 
 export const routeWaypoints: RouteWaypoint[] = [
-  { steps: 0, lat: 47.315238, lng: 7.886964, altM: 425.3 },
-  { steps: 15, lat: 47.315291, lng: 7.886943, altM: 424.2 },
-  { steps: 35, lat: 47.315346, lng: 7.886863, altM: 430.3 },
-  { steps: 50, lat: 47.315384, lng: 7.886805, altM: 435.4 },
-  { steps: 66, lat: 47.315432, lng: 7.886742, altM: 436.4 },
-  { steps: 85, lat: 47.315491, lng: 7.886672, altM: 442.2 },
-  { steps: 100, lat: 47.315537, lng: 7.886617, altM: 446.4 },
-  { steps: 113, lat: 47.315562, lng: 7.886567, altM: 450.3 },
-  { steps: 132, lat: 47.315614, lng: 7.886512, altM: 454.1 },
-  { steps: 150, lat: 47.315672, lng: 7.886484, altM: 456.2 },
-  { steps: 163, lat: 47.315713, lng: 7.886459, altM: 460.9 },
-  { steps: 182, lat: 47.315756, lng: 7.886382, altM: 466.0 },
-  { steps: 200, lat: 47.315800, lng: 7.886318, altM: 468.7 },
-  { steps: 228, lat: 47.315868, lng: 7.886228, altM: 472.5 },
-  { steps: 245, lat: 47.315920, lng: 7.886201, altM: 475.1 },
-  { steps: 245, lat: 47.315956, lng: 7.886184, altM: 475.4 },
-  { steps: 264, lat: 47.315993, lng: 7.886128, altM: 479.0 },
-  { steps: 264, lat: 47.316017, lng: 7.886104, altM: 480.5 },
-  { steps: 292, lat: 47.316158, lng: 7.885939, altM: 485.6 },
-  { steps: 300, lat: 47.316209, lng: 7.885907, altM: 486.7 },
-  { steps: 313, lat: 47.316249, lng: 7.885859, altM: 490.1 },
-  { steps: 333, lat: 47.316294, lng: 7.885770, altM: 494.1 },
-  { steps: 350, lat: 47.316357, lng: 7.885732, altM: 499.5 },
-  { steps: 361, lat: 47.316380, lng: 7.885688, altM: 501.8 },
-  { steps: 361, lat: 47.316589, lng: 7.885501, altM: 506.1 },
-  { steps: 368, lat: 47.316623, lng: 7.885492, altM: 507.7 },
-  { steps: 368, lat: 47.316689, lng: 7.885408, altM: 508.2 },
-  { steps: 400, lat: 47.316827, lng: 7.885253, altM: 515.4 },
-  { steps: 412, lat: 47.316854, lng: 7.885185, altM: 520.3 },
-  { steps: 431, lat: 47.316912, lng: 7.885108, altM: 524.7 },
-  { steps: 450, lat: 47.316976, lng: 7.885032, altM: 525.7 },
-  { steps: 460, lat: 47.317006, lng: 7.885007, altM: 527.2 },
-  { steps: 468, lat: 47.317033, lng: 7.884987, altM: 533.7 },
-  { steps: 468, lat: 47.317057, lng: 7.884960, altM: 533.4 },
-  { steps: 478, lat: 47.317091, lng: 7.884902, altM: 534.3 },
-  { steps: 500, lat: 47.317186, lng: 7.884797, altM: 536.4 },
-  { steps: 517, lat: 47.317237, lng: 7.884733, altM: 541.2 },
-  { steps: 534, lat: 47.317298, lng: 7.884681, altM: 543.0 },
-  { steps: 550, lat: 47.317350, lng: 7.884630, altM: 546.4 },
-  { steps: 583, lat: 47.317409, lng: 7.884567, altM: 549.1 },
-  { steps: 611, lat: 47.317465, lng: 7.884524, altM: 549.9 },
-  { steps: 641, lat: 47.317508, lng: 7.884445, altM: 555.2 },
-  { steps: 663, lat: 47.317555, lng: 7.884431, altM: 553.8 },
-  { steps: 663, lat: 47.317593, lng: 7.884401, altM: 554.5 },
-  { steps: 663, lat: 47.317681, lng: 7.884235, altM: 564.1 },
-  { steps: 663, lat: 47.317710, lng: 7.884186, altM: 567.6 },
-  { steps: 700, lat: 47.317797, lng: 7.884059, altM: 574.7 },
-  { steps: 716, lat: 47.317852, lng: 7.884009, altM: 579.6 },
-  { steps: 738, lat: 47.317929, lng: 7.883961, altM: 582.2 },
-  { steps: 750, lat: 47.317965, lng: 7.883916, altM: 582.4 },
-  { steps: 759, lat: 47.317994, lng: 7.883879, altM: 584.3 },
-  { steps: 775, lat: 47.318053, lng: 7.883851, altM: 584.5 },
-  { steps: 786, lat: 47.318088, lng: 7.883802, altM: 589.0 },
-  { steps: 800, lat: 47.318130, lng: 7.883750, altM: 590.8 },
-  { steps: 820, lat: 47.318193, lng: 7.883702, altM: 593.7 },
-  { steps: 838, lat: 47.318243, lng: 7.883654, altM: 600.8 },
-  { steps: 850, lat: 47.318268, lng: 7.883605, altM: 605.2 },
-  { steps: 875, lat: 47.318333, lng: 7.883539, altM: 606.6 },
-  { steps: 900, lat: 47.318369, lng: 7.883431, altM: 612.8 },
-  { steps: 927, lat: 47.318432, lng: 7.883361, altM: 617.1 },
-  { steps: 950, lat: 47.318487, lng: 7.883302, altM: 623.7 },
-  { steps: 978, lat: 47.318552, lng: 7.883266, altM: 628.8 },
-  { steps: 1000, lat: 47.318601, lng: 7.883238, altM: 632.6 },
-  { steps: 1014, lat: 47.318642, lng: 7.883202, altM: 639.0 },
-  { steps: 1033, lat: 47.318693, lng: 7.883140, altM: 640.9 },
-  { steps: 1050, lat: 47.318741, lng: 7.883095, altM: 645.1 },
-  { steps: 1064, lat: 47.318785, lng: 7.883075, altM: 650.4 },
-  { steps: 1085, lat: 47.318839, lng: 7.883024, altM: 653.2 },
-  { steps: 1100, lat: 47.318873, lng: 7.882972, altM: 654.9 },
-  { steps: 1114, lat: 47.318906, lng: 7.882923, altM: 662.6 },
-  { steps: 1133, lat: 47.318966, lng: 7.882887, altM: 663.9 },
-  { steps: 1150, lat: 47.319001, lng: 7.882823, altM: 664.8 },
-  { steps: 1150, lat: 47.319000, lng: 7.882818, altM: 664.0 },
+  { steps: 0, lat: 47.3152241, lng: 7.8869355, altM: 429.8 },
+  { steps: 45, lat: 47.3153331, lng: 7.8867673, altM: 438.3 },
+  { steps: 70, lat: 47.3154147, lng: 7.8867189, altM: 443.0 },
+  { steps: 100, lat: 47.3155006, lng: 7.8866203, altM: 449.0 },
+  { steps: 137, lat: 47.3155916, lng: 7.8865018, altM: 456.9 },
+  { steps: 172, lat: 47.3157094, lng: 7.8864225, altM: 464.8 },
+  { steps: 200, lat: 47.3157808, lng: 7.8863183, altM: 470.5 },
+  { steps: 225, lat: 47.3158539, lng: 7.8862188, altM: 475.0 },
+  { steps: 240, lat: 47.3159021, lng: 7.8861619, altM: 477.7 },
+  { steps: 240, lat: 47.31595, lng: 7.8861231, altM: 479.6 },
+  { steps: 259, lat: 47.3160117, lng: 7.8860679, altM: 482.6 },
+  { steps: 265, lat: 47.3160329, lng: 7.8860413, altM: 483.6 },
+  { steps: 265, lat: 47.3160501, lng: 7.8860165, altM: 484.5 },
+  { steps: 300, lat: 47.3161606, lng: 7.8858893, altM: 490.1 },
+  { steps: 304, lat: 47.3161774, lng: 7.8858906, altM: 490.7 },
+  { steps: 339, lat: 47.3162887, lng: 7.8857338, altM: 498.6 },
+  { steps: 362, lat: 47.3163741, lng: 7.8856494, altM: 501.9 },
+  { steps: 362, lat: 47.3164018, lng: 7.8856352, altM: 502.9 },
+  { steps: 362, lat: 47.3165481, lng: 7.8854647, altM: 507.2 },
+  { steps: 362, lat: 47.3165617, lng: 7.8854577, altM: 507.5 },
+  { steps: 371, lat: 47.3165997, lng: 7.8854398, altM: 508.8 },
+  { steps: 371, lat: 47.3166287, lng: 7.8854244, altM: 509.8 },
+  { steps: 371, lat: 47.3166738, lng: 7.8853643, altM: 511.4 },
+  { steps: 392, lat: 47.3167464, lng: 7.8852823, altM: 514.9 },
+  { steps: 400, lat: 47.3167693, lng: 7.8852403, altM: 516.6 },
+  { steps: 407, lat: 47.3167783, lng: 7.8851993, altM: 519.0 },
+  { steps: 448, lat: 47.3169333, lng: 7.8850457, altM: 527.3 },
+  { steps: 458, lat: 47.3169599, lng: 7.8849944, altM: 529.8 },
+  { steps: 468, lat: 47.3170033, lng: 7.8849668, altM: 532.0 },
+  { steps: 468, lat: 47.3170204, lng: 7.8849626, altM: 533.6 },
+  { steps: 468, lat: 47.3170309, lng: 7.8849482, altM: 534.5 },
+  { steps: 478, lat: 47.3170544, lng: 7.8848944, altM: 536.3 },
+  { steps: 500, lat: 47.3171451, lng: 7.8848219, altM: 540.6 },
+  { steps: 508, lat: 47.3171747, lng: 7.8848019, altM: 542.2 },
+  { steps: 529, lat: 47.3172304, lng: 7.8847034, altM: 545.4 },
+  { steps: 600, lat: 47.3174781, lng: 7.8844694, altM: 557.1 },
+  { steps: 603, lat: 47.3174863, lng: 7.8844583, altM: 558.3 },
+  { steps: 611, lat: 47.3175105, lng: 7.8844446, altM: 559.5 },
+  { steps: 611, lat: 47.3175571, lng: 7.8844112, altM: 561.3 },
+  { steps: 611, lat: 47.3175618, lng: 7.884396, altM: 561.4 },
+  { steps: 629, lat: 47.3175996, lng: 7.8843209, altM: 563.9 },
+  { steps: 652, lat: 47.3176678, lng: 7.8842451, altM: 567.1 },
+  { steps: 668, lat: 47.3176996, lng: 7.8841767, altM: 569.4 },
+  { steps: 688, lat: 47.3177589, lng: 7.8841143, altM: 572.2 },
+  { steps: 695, lat: 47.3177825, lng: 7.8841171, altM: 573.4 },
+  { steps: 700, lat: 47.3177902, lng: 7.8840914, altM: 574.3 },
+  { steps: 703, lat: 47.3177925, lng: 7.8840783, altM: 574.7 },
+  { steps: 722, lat: 47.3178566, lng: 7.8840253, altM: 577.6 },
+  { steps: 752, lat: 47.3179302, lng: 7.8839068, altM: 581.8 },
+  { steps: 781, lat: 47.318026, lng: 7.8838254, altM: 585.3 },
+  { steps: 800, lat: 47.3180802, lng: 7.8837517, altM: 588.1 },
+  { steps: 826, lat: 47.3181557, lng: 7.8836759, altM: 592.7 },
+  { steps: 837, lat: 47.3181937, lng: 7.883667, altM: 594.2 },
+  { steps: 847, lat: 47.3182139, lng: 7.8836195, altM: 596.3 },
+  { steps: 877, lat: 47.3183099, lng: 7.8835358, altM: 601.9 },
+  { steps: 900, lat: 47.318361, lng: 7.8834412, altM: 606.7 },
+  { steps: 933, lat: 47.3184266, lng: 7.8833297, altM: 613.7 },
+  { steps: 943, lat: 47.3184583, lng: 7.8833147, altM: 615.3 },
+  { steps: 950, lat: 47.318478, lng: 7.883328, altM: 616.4 },
+  { steps: 960, lat: 47.3185096, lng: 7.8833065, altM: 618.9 },
+  { steps: 965, lat: 47.318507, lng: 7.8832901, altM: 620.4 },
+  { steps: 978, lat: 47.3185517, lng: 7.8832852, altM: 623.3 },
+  { steps: 988, lat: 47.3185527, lng: 7.8832419, altM: 626.2 },
+  { steps: 1000, lat: 47.3185886, lng: 7.8832247, altM: 629.1 },
+  { steps: 1014, lat: 47.31863, lng: 7.883198, altM: 631.7 },
+  { steps: 1032, lat: 47.3186672, lng: 7.8831335, altM: 635.7 },
+  { steps: 1062, lat: 47.3187574, lng: 7.8830757, altM: 642.9 },
+  { steps: 1093, lat: 47.31883, lng: 7.882976, altM: 649.8 },
+  { steps: 1100, lat: 47.3188528, lng: 7.8829677, altM: 651.2 },
+  { steps: 1102, lat: 47.3188568, lng: 7.8829638, altM: 651.5 },
+  { steps: 1113, lat: 47.3188642, lng: 7.8829241, altM: 654.6 },
+  { steps: 1126, lat: 47.3189025, lng: 7.8829069, altM: 657.4 },
+  { steps: 1150, lat: 47.3189565, lng: 7.8828313, altM: 661.3 },
+  { steps: 1150, lat: 47.3189602, lng: 7.8828263, altM: 661.4 },
+  { steps: 1150, lat: 47.3189526, lng: 7.8828031, altM: 662.5 }
 ];

@@ -13,6 +13,7 @@ import { analyzeRouteTrack } from "../../lib/geo/routeMatcher";
 import { localStore } from "../../lib/storage/localStore";
 import type { RouteTrackSummary, RunPoint, RunRecord } from "../../lib/types";
 import { validateRun } from "../../lib/validation/validateRun";
+import { advanceDisplayedSteps, displayTickMs } from "./displayedSteps";
 import { appendRunPoint, positionToRunPoint } from "./runUtils";
 import { isSensorLogEnabled, sensorLog } from "../../lib/debug/sensorLog";
 
@@ -136,6 +137,48 @@ export function RunPage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [config.gpsAccuracyReviewMaxM]);
 
+  // Bildschirm wach halten. Referenzlauf 2026-09-08 auf dem iPhone: die
+  // einzige Aufzeichnungsluecke des Laufs dauerte 14 s und lag exakt beim
+  // Losgehen — Handy in die Tasche, Bildschirm aus, Safari pausiert
+  // watchPosition. Der Laeufer war danach schon auf Stufe 4. Mit Wake Lock
+  // bleibt der Strom an Fixes waehrend des Laufs durchgehend. Wird das Tab
+  // trotzdem unsichtbar (Anruf, App-Wechsel), gibt iOS den Lock frei und er
+  // wird beim Zurueckkehren neu angefordert. Ohne Unterstuetzung passiert
+  // schlicht nichts.
+  useEffect(() => {
+    let sentinel: WakeLockSentinel | null = null;
+    let disposed = false;
+
+    async function acquire() {
+      if (disposed || !("wakeLock" in navigator) || document.visibilityState !== "visible") {
+        return;
+      }
+      try {
+        sentinel = await navigator.wakeLock.request("screen");
+        sentinel.addEventListener("release", () => {
+          sentinel = null;
+        });
+        debugRunEvent("wake_lock_acquired");
+      } catch (error) {
+        debugRunEvent("wake_lock_failed", { message: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    function onVisibility() {
+      if (document.visibilityState === "visible" && sentinel === null) {
+        void acquire();
+      }
+    }
+
+    void acquire();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      void sentinel?.release();
+    };
+  }, []);
+
   useEffect(() => {
     const now = Date.now();
     // Die ersten Punkte sofort sichern (damit ein früher Reload den Start behält),
@@ -195,6 +238,25 @@ export function RunPage() {
   const gpsLabel = tracking.confidenceLevel === "high" ? "GPS OK" : tracking.confidenceLevel === "estimated" ? "GPS geschätzt" : "GPS ungenau";
   const steps = tracking.finalSteps;
   const pacePer100 = steps > 0 ? elapsed / (steps / 100) : null;
+  // Die grosse Zahl folgt der Messung in menschlicher Kadenz (siehe
+  // displayedSteps.ts): sie beginnt bei 1 und laesst keine Zahl aus, auch wenn
+  // der erste Fix mit Bewegung schon auf 2 oder 4 projiziert. Wertung, Pace
+  // und Speicherung bleiben auf dem gemessenen Wert.
+  const [displayedSteps, setDisplayedSteps] = useState(() => tracking.finalSteps);
+  useEffect(() => {
+    if (displayedSteps === steps) {
+      return;
+    }
+    if (steps < displayedSteps) {
+      setDisplayedSteps(steps);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setDisplayedSteps((current) => advanceDisplayedSteps(current, steps)),
+      displayTickMs
+    );
+    return () => window.clearTimeout(timer);
+  }, [displayedSteps, steps]);
   const coach = motivationMessages.find((item) => steps >= item.minSteps && steps < item.maxSteps)?.message ?? "Du hast es gleich geschafft.";
   // Live-Höhenmeter relativ zur stabilen Start-Referenz (geglättet über die
   // letzten 3 Höhenwerte), nicht relativ zu einem Pufferanfang.
@@ -340,9 +402,9 @@ export function RunPage() {
           <header><span className={`live-dot ${gpsOk ? "" : "warn"}`} /> {gpsLabel} <span>+{altitudeGain} m</span></header>
           <strong className="big-timer">{formatDuration(elapsed)}</strong>
           <small>Zeit</small>
-          <b>{steps} / {config.totalSteps}</b>
+          <b>{displayedSteps} / {config.totalSteps}</b>
           <span>Stufen</span>
-          <ProgressBar value={steps} max={config.totalSteps} />
+          <ProgressBar value={displayedSteps} max={config.totalSteps} />
           <div className="run-metrics">
             <span><Timer /> Pace / 100<br /><strong>{formatPace(pacePer100)}</strong></span>
             <span>GPS Punkte<br /><strong>{fullPoints.length}</strong></span>

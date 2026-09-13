@@ -1,0 +1,47 @@
+device,run,position_type,stairs_value,elapsed_s,gps_lat,gps_lon,gps_alt_m,gps_accuracy_m,notes
+iphone,1,stairs_mark,100,96.9,47.315503,7.886618,442.3,3.4,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,200,189.9,47.315784,7.886317,464.6,3.1,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,300,287.9,47.316162,7.88588,486.0,2.9,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,400,424.9,47.316775,7.885238,512.8,3.0,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,500,515.9,47.317149,7.884821,537.7,3.7,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,600,590.9,47.31748,7.88447,550.5,3.2,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,700,675.9,47.317791,7.88409,570.9,4.4,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,800,746.9,47.318081,7.883754,588.6,3.6,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,900,833.9,47.318364,7.883437,608.4,4.3,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,1000,924.9,47.318591,7.883225,631.6,4.4,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,1100,1015.9,47.318856,7.882968,651.4,3.5,"Screenshot, Punktabstand 0.0s"
+iphone,1,stairs_mark,1150,1057.9,47.318957,7.882828,663.8,4.2,"Screenshot, Punktabstand 0.0s"
+iphone,1,no_stairs_start,1,227.9,47.315904,7.886158,474.7,3.3,iphone-no-stairs-start-01.PNG
+iphone,1,no_stairs_start,2,339.9,47.316379,7.885646,496.6,3.6,iphone-no-stairs-start-02.PNG
+iphone,1,no_stairs_start,3,384.9,47.316604,7.885437,504.2,3.1,iphone-no-stairs-start-03.PNG
+iphone,1,no_stairs_start,4,480.9,47.317006,7.884965,528.7,3.3,iphone-no-stairs-start-04.PNG
+iphone,1,no_stairs_start,5,603.9,47.31751,7.884446,552.3,3.2,iphone-no-stairs-start-05.PNG
+iphone,1,no_stairs_stop,1,240.9,47.315951,7.886122,474.8,3.7,iphone-no-stairs-stop-01.PNG
+iphone,1,no_stairs_stop,2,374.9,47.316565,7.885455,504.1,3.2,iphone-no-stairs-stop-02.PNG
+iphone,1,no_stairs_stop,3,398.9,47.316677,7.88536,506.5,3.1,iphone-no-stairs-stop-03.PNG
+iphone,1,no_stairs_stop,4,488.9,47.317037,7.884942,529.0,3.5,iphone-no-stairs-stop-04.PNG
+iphone,1,no_stairs_stop,5,615.9,47.31756,7.884397,555.3,3.7,iphone-no-stairs-stop-05.PNG
+android,2,stairs_mark,100,87.1,47.315447,7.886699,470.5,3.2,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,200,193.1,47.315705,7.886346,513.3,3.1,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,300,290.1,47.316192,7.885865,519.6,3.1,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,400,428.1,47.316744,7.885287,541.9,3.2,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,500,533.1,47.317088,7.884904,560.8,3.5,"Screenshot, Punktabstand 0.2s"
+android,2,stairs_mark,600,642.1,47.317412,7.884466,571.0,3.7,"Screenshot, Punktabstand 0.2s"
+android,2,stairs_mark,700,724.1,47.317693,7.884175,581.2,3.3,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,800,816.1,47.317982,7.88383,590.7,3.2,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,900,920.1,47.318133,7.883677,598.7,3.1,"Screenshot, Punktabstand 0.1s"
+android,2,stairs_mark,1000,1031.1,47.318463,7.883466,616.3,3.0,"Screenshot, Punktabstand 0.2s"
+android,2,stairs_mark,1100,1143.1,47.318625,7.883288,620.3,3.1,"Screenshot, Punktabstand 0.2s"
+android,2,stairs_mark,1150,1194.1,47.318693,7.883172,622.9,3.5,"Screenshot, Punktabstand 0.1s"
+android,2,no_stairs_start,1,230.1,47.31587,7.886198,515.4,3.2,iphone-no-stairs-start-02-01.jpg
+android,2,no_stairs_start,2,252.1,47.315986,7.886105,515.6,3.5,iphone-no-stairs-start-02-02.jpg
+android,2,no_stairs_start,3,346.1,47.316295,7.885748,530.2,3.1,iphone-no-stairs-start-02-03.jpg
+android,2,no_stairs_start,4,385.1,47.316565,7.885457,537.2,3.2,iphone-no-stairs-start-02-04.jpg
+android,2,no_stairs_start,5,495.1,47.316963,7.885013,554.2,3.2,iphone-no-stairs-start-02-05.jpg
+android,2,no_stairs_start,6,625.1,47.317422,7.884585,563.7,3.2,iphone-no-stairs-start-02-06.jpg
+android,2,no_stairs_stop,1,237.1,47.315899,7.886168,514.4,3.0,iphone-no-stairs-stop-02-01.jpg
+android,2,no_stairs_stop,2,258.1,47.316003,7.886084,515.8,3.3,iphone-no-stairs-stop-02-02.jpg
+android,2,no_stairs_stop,3,377.1,47.316522,7.885488,536.5,3.4,iphone-no-stairs-stop-02-03.jpg
+android,2,no_stairs_stop,4,398.1,47.316631,7.885386,538.4,3.3,iphone-no-stairs-stop-02-04.jpg
+android,2,no_stairs_stop,5,500.1,47.316973,7.884984,555.7,3.2,iphone-no-stairs-stop-02-05.jpg
+android,2,no_stairs_stop,6,635.1,47.317426,7.884565,566.5,3.3,iphone-no-stairs-stop-02-06.jpg

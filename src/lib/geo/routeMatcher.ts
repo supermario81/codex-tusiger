@@ -1,4 +1,4 @@
-import { routeWaypoints, type RouteWaypoint } from "../../data/challenge";
+import { routeWaypoints, stairsPerFootfallAt, type RouteWaypoint } from "../../data/challenge";
 import type {
   ChallengeConfig,
   RoutePointTelemetry,
@@ -132,9 +132,22 @@ export function classifyJumpEvents(samples: JumpFlagSample[]): JumpEventSummary 
         : event.reduce((sum, sample) => sum + sample.displacementM, 0);
     const accuracyBudgetM = Math.max(0, ...event.map((sample) => sample.accuracyBudgetM ?? 0));
     const noiseToleranceM = Math.max(jumpNoiseFloorM, accuracyBudgetM);
+    // Kurzer Ausschlag: hoechstens drei Samples, binnen fuenf Sekunden wieder
+    // am Ausgangsort (Netto-Versatz unter der Rauschgrenze — bewusst nicht
+    // unter dem gemeldeten Genauigkeitsbudget, das ein Geraet beliebig hoch
+    // behaupten kann). 200 m hin und zurueck in zwei Sekunden legt kein
+    // Mensch zurueck; das ist Mehrwegeempfang. Bisher machte der Einzelversatz
+    // ueber 100 m so ein Ereignis unbedingt physisch und kippte einen sonst
+    // makellosen Lauf in die Pruefung. Ein anhaltender Ausflug — mehr Samples
+    // oder laenger als das Fenster — bleibt physisch, auch wenn er zurueckkehrt.
+    const briefExcursion =
+      event.length <= 3 &&
+      last.atMs - first.atMs <= jumpEventGapSeconds * 1000 &&
+      netDisplacementM <= jumpNoiseFloorM;
     const physical =
-      maxDisplacement > physicalSingleDisplacementM ||
-      (fastSamples.length >= 2 && netDisplacementM > noiseToleranceM);
+      !briefExcursion &&
+      (maxDisplacement > physicalSingleDisplacementM ||
+        (fastSamples.length >= 2 && netDisplacementM > noiseToleranceM));
     if (physical) {
       physicalJumpEventCount += 1;
       maxJumpDisplacementM = Math.max(maxJumpDisplacementM, maxDisplacement);
@@ -331,6 +344,11 @@ export function matchPointToRoute(
   };
 }
 
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
 function mean(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
@@ -371,6 +389,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       offRouteRatio: 1,
       continuityScore: 0,
       altitudeConsistencyRatio: null,
+      altitudeDriftM: null,
       filteredSpeedMps: null,
       rawSpeedMps: null,
       pacePer100Steps: null,
@@ -397,6 +416,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   let ascentAnchorAltitudeM: number | null = null;
   const matchedBands = new Set<number>();
   const altitudeConsistency: boolean[] = [];
+  const altitudeDeltas: number[] = [];
   const telemetry: RoutePointTelemetry[] = [];
 
   const jumpSamples: JumpFlagSample[] = [];
@@ -516,8 +536,13 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
       matchedBands.add(Math.floor(filteredSteps / 100));
     } else {
       const secondsSinceAccepted = lastAcceptedAt === null ? Infinity : (currentAt - lastAcceptedAt) / 1000;
+      // Auf einem stufenlosen Weg wird nichts geschaetzt: Das ist der einzige
+      // Pfad, der Stufen ohne Position vergibt, und dort gibt es keine. Ueber
+      // das Routenmodell stehen die Zonen sonst nur implizit still.
+      const onStepFreePath = stairsPerFootfallAt(previousSteps) === 0;
       const canInfer =
         previousSteps >= 25 &&
+        !onStepFreePath &&
         filteredStepSpeed > 0 &&
         secondsSinceAccepted <= 18 &&
         dt > 0 &&
@@ -563,6 +588,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     const altitudeCanJudge = point.altitudeM !== null && (point.altitudeAccuracyM === null || point.altitudeAccuracyM <= 65);
     if (match.altitudeDeltaM !== null && altitudeCanJudge) {
       altitudeConsistency.push(Math.abs(match.altitudeDeltaM) <= 45);
+      altitudeDeltas.push(match.altitudeDeltaM);
     }
 
     if (point.altitudeM !== null && altitudeCanJudge) {
@@ -619,6 +645,16 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   const altitudeConsistencyRatio = altitudeConsistency.length
     ? altitudeConsistency.filter(Boolean).length / altitudeConsistency.length
     : null;
+  // Hoehen-Drift: Testlauf 2026-09-08 auf Android meldete durchgehend +/-3 m
+  // Genauigkeit, lag aber am Start 55 m ueber und am Ende 11 m unter dem
+  // Routenprofil. Die gemeldete Genauigkeit verraet das nicht — der Verlauf
+  // der Abweichung schon. Beide iPhone-Laeufe driften um +9 m, beide
+  // Android-Laeufe um -26 und -65 m.
+  const driftWindow = 30;
+  const altitudeDriftM =
+    altitudeDeltas.length >= driftWindow * 2
+      ? median(altitudeDeltas.slice(-driftWindow)) - median(altitudeDeltas.slice(0, driftWindow))
+      : null;
   const firstAltitude = sorted.find((point) => point.altitudeM !== null)?.altitudeM ?? null;
   const lastAltitude = [...sorted].reverse().find((point) => point.altitudeM !== null)?.altitudeM ?? null;
   const altitudeGainM = firstAltitude === null || lastAltitude === null ? null : lastAltitude - firstAltitude;
@@ -662,6 +698,7 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
     offRouteRatio,
     continuityScore,
     altitudeConsistencyRatio,
+    altitudeDriftM: altitudeDriftM === null ? null : Math.round(altitudeDriftM * 10) / 10,
     filteredSpeedMps,
     rawSpeedMps: rawSpeedValues.length ? mean(rawSpeedValues) : null,
     pacePer100Steps: durationSeconds > 0 && finalSteps > 0 ? durationSeconds / (finalSteps / 100) : null,
