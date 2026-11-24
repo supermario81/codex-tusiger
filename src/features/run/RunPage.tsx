@@ -410,6 +410,7 @@ export function RunPage() {
             <span>GPS Punkte<br /><strong>{fullPoints.length}</strong></span>
             <span>Höhenmeter<br /><strong>{altitudeGain}</strong></span>
           </div>
+          <p className="run-hint">Handy nicht sperren, sonst stoppt die Aufzeichnung.</p>
         </div>
         <CoachMessage message={coach} />
         <button

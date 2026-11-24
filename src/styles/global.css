@@ -729,6 +729,7 @@ form { display: grid; gap: 16px; }
 .run-dashboard small, .run-dashboard > span { color: rgba(247,243,232,.62); text-transform: uppercase; letter-spacing: .08em; }
 .run-dashboard > b { display: block; margin-top: 18px; font-size: 2.3rem; color: #f7f3e8; }
 .run-dashboard .progress-bar { margin-top: 18px; }
+.run-dashboard .run-hint { margin: 14px 0 0; font-size: .92rem; text-align: center; color: rgba(247,243,232,.78); }
 .run-metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

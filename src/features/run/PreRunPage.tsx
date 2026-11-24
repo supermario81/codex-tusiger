@@ -216,6 +216,7 @@ export function PreRunPage() {
             {stabilizing ? " — stabilisiert sich..." : ""}
           </p>
         </GlassPanel>
+        <p className="pre-run-hint"><strong>Handy während des Laufs nicht sperren.</strong> Sonst stoppt die Aufzeichnung.</p>
         {state !== "watching" ? (
           <Button icon={<LocateFixed />} onClick={startLocationWatch}>Standort prüfen</Button>
         ) : (
