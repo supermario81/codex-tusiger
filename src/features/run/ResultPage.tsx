@@ -17,10 +17,10 @@ function checkVerdictLabel(level: "pass" | "review" | "fail") {
 
 export function ResultPage() {
   const { runId } = useParams();
-  const { config, runs } = useApp();
+  const { config, runs, userId } = useApp();
   const storedRun = useMemo(
-    () => runId ? localStore.readRuns().find((item) => item.id === runId) ?? null : null,
-    [runId]
+    () => runId ? localStore.readRuns(userId).find((item) => item.id === runId) ?? null : null,
+    [runId, userId]
   );
   // Die vollständigere Quelle gewinnt: die lokale Kopie hat Punkte und
   // Prüfdetails, die Supabase-Zeile nur die Kennzahlen (bis Migration 0009).

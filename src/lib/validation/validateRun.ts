@@ -305,7 +305,13 @@ export function validateRun(
     record("continuity", "Kontinuität", continuityMeasured, "pass", "Fortschritt entlang der Route ausreichend kontinuierlich.");
   } else if (tracking.continuityScore >= 0.38) {
     record("continuity", "Kontinuität", continuityMeasured, "review", "Route wurde nur teilweise kontinuierlich erfasst.");
-  } else if (routeCompletionStrong && endZonePlausible && tracking.continuityScore >= 0.3) {
+  } else if (
+    routeCompletionStrong &&
+    endZonePlausible &&
+    // Gesperrter Bildschirm: iOS stoppt die Ortung, Start, Ziel, Zeit und Höhe
+    // sind aber belegt. Das ist ein Prüffall, kein ungültiger Lauf.
+    (tracking.continuityScore >= 0.3 || coreChecksPass)
+  ) {
     record("continuity", "Kontinuität", continuityMeasured, "review", "Routenabschnitte wurden lückenhaft erfasst, Zielabschluss bleibt prüfbar.");
   } else {
     record("continuity", "Kontinuität", continuityMeasured, "fail", "Route wurde nicht kontinuierlich genug erfasst.");

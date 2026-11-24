@@ -13,9 +13,9 @@ import { playRunFailSound, playRunFanfare } from "../../lib/audio/runAudio";
 import { debugRunEvent } from "../../lib/debug/runDebug";
 
 export function FinishPage() {
-  const { config } = useApp();
+  const { config, userId } = useApp();
   const runId = localStorage.getItem("tusiger.lastRunId");
-  const run = localStore.readRuns().find((item) => item.id === runId);
+  const run = localStore.readRuns(userId).find((item) => item.id === runId);
   // Erfolgserlebnis für gültige UND zu prüfende Läufe — nur hart ungültige
   // Läufe bekommen den Sorry-Screen.
   const isCelebration = Boolean(run && (run.status === "valid" || run.status === "needs_review"));

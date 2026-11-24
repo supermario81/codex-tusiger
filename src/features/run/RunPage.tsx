@@ -31,7 +31,7 @@ function compactTrackingSummary(summary: RouteTrackSummary, telemetryLimit = 160
 export function RunPage() {
   const { config, profile, saveRun, userId } = useApp();
   const navigate = useNavigate();
-  const restoredRun = useMemo(() => localStore.readActiveRun(), []);
+  const [restoredRun] = useState(() => localStore.readActiveRun(userId, config.maxDurationSeconds));
   const [startedAt] = useState(() => restoredRun?.startedAt ?? new Date().toISOString());
   const [elapsed, setElapsed] = useState(() => restoredRun?.durationSeconds ?? 0);
   const [fullPoints, setFullPoints] = useState<RunPoint[]>(() => restoredRun?.points ?? []);
@@ -45,7 +45,7 @@ export function RunPage() {
   const lastPersistedAt = useRef(0);
   const lastLoggedPointCount = useRef(0);
   const stableStartFrozen = useRef<RunPoint | null>(null);
-  const runIdRef = useRef<string>(crypto.randomUUID());
+  const runIdRef = useRef<string>(restoredRun && restoredRun.id !== "active-run" ? restoredRun.id : crypto.randomUUID());
   const tracking = useMemo(() => analyzeRouteTrack(fullPoints, config), [config, fullPoints]);
 
   // Stabile Start-Referenz: einmal berechnet (Median der ersten guten Punkte),
@@ -189,7 +189,7 @@ export function RunPage() {
     }
     lastPersistedAt.current = now;
     const active: RunRecord = {
-      id: "active-run",
+      id: runIdRef.current,
       userId,
       startedAt,
       endedAt: null,
@@ -344,7 +344,7 @@ export function RunPage() {
     sensorLog.stop();
 
     try {
-      await saveRun(run);
+      await saveRun(run, forceReview);
       localStorage.setItem("tusiger.lastRunId", run.id);
       localStore.clearActiveRun();
       navigate("/finish");

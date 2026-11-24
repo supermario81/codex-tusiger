@@ -5,7 +5,7 @@ import { PageShell } from "../../components/layout/PageShell";
 import { Avatar } from "../../components/ui/Avatar";
 import { GlassPanel } from "../../components/ui/Card";
 import { formatDuration } from "../../lib/geo/geo";
-import { filterLeaderboardByTab, rankLeaderboard } from "../../lib/community/community";
+import { filterLeaderboardByTab, leaderboardSince, rankLeaderboard } from "../../lib/community/community";
 
 // Die ID bleibt der deutsche Filter-Schlüssel (filterLeaderboardByTab), nur das
 // sichtbare Label wird übersetzt.
@@ -20,7 +20,7 @@ const tabs: Array<{ id: TabId; de: string; en: string }> = [
 export function LeaderboardPage() {
   const [active, setActive] = useState<TabId>("Gesamt");
   const [scope, setScope] = useState<"private" | "public">("private");
-  const { language, leaderboard, profile, runs, trackEvent } = useApp();
+  const { language, leaderboard, loadLeaderboard, profile, runs, trackEvent } = useApp();
   const t = language === "en" ? {
     title: "Leaderboard",
     subtitle: "Your times and the public community ranking.",
@@ -56,7 +56,15 @@ export function LeaderboardPage() {
       status: run.status,
       isCurrentUser: true
     })), [profile?.avatarUrl, profile?.nickname, runs, t.you]);
-  const activeSource = scope === "private" ? privateLeaderboard : leaderboard;
+  const [periodRuns, setPeriodRuns] = useState(leaderboard);
+  useEffect(() => {
+    let current = true;
+    void loadLeaderboard(leaderboardSince(active)).then((next) => current && setPeriodRuns(next));
+    return () => {
+      current = false;
+    };
+  }, [active, leaderboard, loadLeaderboard]);
+  const activeSource = scope === "private" ? privateLeaderboard : periodRuns;
   // Rang muss nach dem Zeitfilter vergeben werden, sonst zeigt der erste Eintrag
   // eines gefilterten Zeitraums den Rang aus der ungefilterten Gesamtliste.
   const source = rankLeaderboard(filterLeaderboardByTab(activeSource, active));

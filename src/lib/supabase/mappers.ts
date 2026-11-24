@@ -29,16 +29,6 @@ export function toRunInsert(run: RunRecord) {
   };
 }
 
-// Spalten, die erst mit Migration 0009 existieren. Fehlen sie, faellt der
-// Insert auf das alte Schema zurueck statt den Lauf ganz zu verlieren.
-export const runDetailColumns = ["validation_checks", "tracking_summary"] as const;
-
-export function toRunInsertWithoutDetails(run: RunRecord) {
-  const row = toRunInsert(run) as Record<string, unknown>;
-  runDetailColumns.forEach((column) => delete row[column]);
-  return row;
-}
-
 export function fromConfigRow(row: Record<string, unknown>): ChallengeConfig {
   return {
     id: String(row.id),

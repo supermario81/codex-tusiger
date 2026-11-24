@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { defaultChallengeConfig, historyFallback, legalFallback } from "../data/challenge";
 import { normalizeInviteCode } from "../lib/community/community";
 import { isSupabaseConfigured, supabase } from "../lib/supabase/client";
-import { fromConfigRow, fromGroupRow, fromHistoryRow, fromLegalRow, fromProfileRow, fromRunRow, toRunInsert, toRunInsertWithoutDetails } from "../lib/supabase/mappers";
+import { fromConfigRow, fromGroupRow, fromHistoryRow, fromLegalRow, fromProfileRow, fromRunRow, toRunInsert } from "../lib/supabase/mappers";
 import { localStore } from "../lib/storage/localStore";
 import type { ChallengeConfig, Group, HistoryItem, LegalPage, Profile, PublicRun, RunRecord } from "../lib/types";
 
@@ -29,7 +29,8 @@ type AppContextValue = {
   saveProfile: (input: { nickname: string; avatarUrl: string; language: "de" | "en"; showInPublicLeaderboard?: boolean }) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
   logout: () => Promise<void>;
-  saveRun: (run: RunRecord) => Promise<void>;
+  saveRun: (run: RunRecord, needsReview?: boolean) => Promise<void>;
+  loadLeaderboard: (since: Date | null, groupId?: string) => Promise<PublicRun[]>;
   createGroup: (group: Pick<Group, "name" | "description" | "isPrivate">) => Promise<Group>;
   joinGroup: (inviteCode: string) => Promise<Group>;
   leaveGroup: (groupId: string) => Promise<void>;
@@ -130,19 +131,6 @@ async function compressAvatarToWebp(file: File) {
   }
 }
 
-function publicRunFromRun(run: RunRecord, rank: number, profile?: Profile | null): PublicRun {
-  return {
-    id: run.id,
-    rank,
-    nickname: profile?.nickname ?? "Tusiger",
-    avatarUrl: profile?.avatarUrl ?? "",
-    durationSeconds: run.durationSeconds,
-    date: run.endedAt ?? run.startedAt,
-    status: run.status,
-    isCurrentUser: true
-  };
-}
-
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -182,6 +170,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loadLeaderboard = useCallback(async (since: Date | null, groupId?: string): Promise<PublicRun[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.rpc("get_leaderboard", { p_since: since?.toISOString() ?? null, p_group_id: groupId ?? null });
+    if (error && import.meta.env.DEV) console.warn("Tusiger leaderboard query failed", error);
+    return ((data ?? []) as Record<string, unknown>[]).map((row, index) => ({
+      id: String(row.id),
+      rank: index + 1,
+      nickname: String(row.nickname ?? "Tusiger"),
+      avatarUrl: String(row.avatar_url ?? ""),
+      durationSeconds: Number(row.duration_seconds),
+      date: String(row.ended_at),
+      status: "valid",
+      isCurrentUser: Boolean(row.is_current_user)
+    }));
+  }, []);
+
   const refreshData = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
       setSetupError("Supabase ist noch nicht konfiguriert. Bitte VITE_SUPABASE_ANON_KEY als .env.local oder GitHub Secret setzen.");
@@ -217,8 +221,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const [{ data: profileRows }, { data: runRows }, myGroupsResult, publicGroupsResult] = await Promise.all([
           currentSupabase.from("profiles").select("*").eq("user_id", user_id).is("deleted_at", null).limit(1),
           currentSupabase.from("runs").select("*").eq("user_id", user_id).order("started_at", { ascending: false }),
-          currentSupabase.rpc("get_my_groups").then((result) => result.error ? currentSupabase.rpc("list_my_groups") : result),
-          currentSupabase.rpc("get_public_groups").then((result) => result.error ? currentSupabase.rpc("list_public_groups") : result)
+          currentSupabase.rpc("get_my_groups"),
+          currentSupabase.rpc("get_public_groups")
         ]);
         const nextProfile = profileRows?.[0] ? fromProfileRow(profileRows[0]) : null;
         setProfile(nextProfile);
@@ -241,27 +245,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      const { data: leaderboardRows, error: leaderboardError } = await supabase
-        .from("leaderboard_public")
-        .select("*")
-        .order("duration_seconds", { ascending: true })
-        .limit(100);
-      if (leaderboardError && import.meta.env.DEV) {
-        console.warn("Tusiger leaderboard query failed", leaderboardError);
-      }
-
-      setLeaderboard(
-        (leaderboardRows ?? []).map((row, index) => ({
-          id: String(row.id),
-          rank: index + 1,
-          nickname: String(row.nickname ?? "Tusiger"),
-          avatarUrl: String(row.avatar_url ?? ""),
-          durationSeconds: Number(row.duration_seconds),
-          date: String(row.ended_at ?? row.started_at),
-          status: "valid",
-          isCurrentUser: row.user_id === currentSession?.user.id
-        }))
-      );
+      setLeaderboard(currentSession?.user ? await loadLeaderboard(null) : []);
     } catch (cause) {
       const message = errorMessage(cause);
       setSetupError(`Supabase Setup unvollständig: ${message}. Bitte Migration ausführen und GitHub Secret VITE_SUPABASE_ANON_KEY setzen.`);
@@ -274,7 +258,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setReady(true);
     }
-  }, [setLanguage]);
+  }, [loadLeaderboard, setLanguage]);
 
   useEffect(() => {
     localStorage.setItem("tusiger.sessionId", localStorage.getItem("tusiger.sessionId") ?? crypto.randomUUID());
@@ -340,46 +324,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const saveProfile = useCallback(async (input: { nickname: string; avatarUrl: string; language: "de" | "en"; showInPublicLeaderboard?: boolean }) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
     const nickname = input.nickname.trim();
-    const { data: duplicateProfiles, error: duplicateError } = await supabase
-      .from("profiles")
-      .select("id,user_id")
-      .ilike("nickname", nickname)
-      .is("deleted_at", null)
-      .neq("user_id", user.id)
-      .limit(1);
-    if (duplicateError) throw duplicateError;
-    if (duplicateProfiles?.length) {
-      throw new Error(input.language === "en" ? "This nickname is already taken." : "Dieser Nickname ist bereits vergeben.");
-    }
     const { error } = await supabase.from("profiles").upsert({
       user_id: user.id,
       nickname,
       avatar_url: input.avatarUrl,
       language: input.language,
       show_in_public_leaderboard: input.showInPublicLeaderboard ?? profile?.showInPublicLeaderboard ?? true,
-      role: profile?.role ?? "user",
       deleted_at: null,
       updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
-    if (error) throw error;
+    if (error) {
+      throw error.code === "23505"
+        ? new Error(input.language === "en" ? "This nickname is already taken." : "Dieser Nickname ist bereits vergeben.")
+        : error;
+    }
     await supabase.auth.updateUser({ data: { language: input.language } }).catch(() => undefined);
     await trackEvent("profile_completed");
     await refreshData();
-  }, [profile?.role, profile?.showInPublicLeaderboard, refreshData, trackEvent, user]);
+  }, [profile?.showInPublicLeaderboard, refreshData, trackEvent, user]);
 
   const logout = useCallback(async () => {
     localStore.clearActiveRun();
-    await supabase?.auth.signOut();
+    await supabase?.auth.signOut({ scope: "local" });
     setSession(null);
     setProfile(null);
     setRuns([]);
     setGroups([]);
   }, []);
 
-  const saveRun = useCallback(async (run: RunRecord) => {
+  const saveRun = useCallback(async (localRun: RunRecord, needsReview = false) => {
+    let run = localRun;
     if (!user || !supabase) {
       localStore.upsertRun(run);
-      setRuns(localStore.readRuns());
+      setRuns(localStore.readRuns(userId));
       return;
     }
     // Bei einem Retry (z. B. Netzabbruch mitten im Punkte-Upload) existiert der
@@ -391,20 +368,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
     if (existingError) throw existingError;
     if (!existingRun) {
-      const { error } = await supabase.from("runs").insert(toRunInsert(run));
-      if (error) {
-        // Migration 0009 (validation_checks/tracking_summary) noch nicht
-        // eingespielt: lieber ohne die Detailspalten speichern als den Lauf
-        // verlieren. Die Details bleiben lokal erhalten.
-        const message = errorMessage(error).toLowerCase();
-        const missingDetailColumn =
-          message.includes("validation_checks") || message.includes("tracking_summary");
-        if (!missingDetailColumn) throw error;
-        if (import.meta.env.DEV) console.warn("Tusiger run detail columns missing, run 0009 migration", error);
-        const { error: fallbackError } = await supabase.from("runs").insert(toRunInsertWithoutDetails(run));
-        if (fallbackError) throw fallbackError;
-      }
+      const { error } = await supabase.from("runs").insert(toRunInsert({ ...run, status: "draft" }));
+      if (error) throw error;
     }
+
     if (run.points.length > 0) {
       // Bereits hochgeladene Punkte überspringen, Rest in Batches — die volle
       // Aufzeichnung (bis zu 7200 Punkte) übersteigt sonst Payload-Limits.
@@ -433,26 +400,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (pointError) throw pointError;
       }
     }
+    // Die Wertung fällt der Server aus den gespeicherten Punkten.
+    const { data: judged, error: judgeError } = await supabase.functions.invoke("validate-run", { body: { runId: run.id, needsReview } });
+    if (judgeError) {
+      throw new Error(language === "en" ? "Run could not be validated. Please try again." : "Lauf konnte nicht geprüft werden. Bitte erneut versuchen.");
+    }
+    run = { ...fromRunRow(judged as Record<string, unknown>), points: localRun.points, trackingSummary: localRun.trackingSummary };
+
     await trackEvent("run_validated", { status: run.status });
     localStore.upsertRun(run);
     setRuns((current) => [run, ...current.filter((item) => item.id !== run.id)]);
-    // Der frisch gespeicherte Lauf muss nach Zeit einsortiert und die Rangfolge
-    // neu vergeben werden — vorher wurde er vorne angehängt und trug zugleich den
-    // letzten Rang, was Podest und Reihenfolge verfälschte.
-    setLeaderboard((current) => {
-      if (run.status !== "valid" || profile?.showInPublicLeaderboard === false) {
-        return current;
-      }
-      return [...current.filter((item) => item.id !== run.id), publicRunFromRun(run, 0, profile)]
-        .sort((a, b) => a.durationSeconds - b.durationSeconds)
-        .map((item, index) => ({ ...item, rank: index + 1 }));
-    });
-  }, [profile, trackEvent, user]);
+    setLeaderboard(await loadLeaderboard(null));
+  }, [language, loadLeaderboard, trackEvent, user, userId]);
 
   const createGroup = useCallback(async (groupInput: Pick<Group, "name" | "description" | "isPrivate">) => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    const currentUser = user;
-    const currentSupabase = supabase;
     const cleanName = groupInput.name.trim();
     if (cleanName.length < 3 || cleanName.length > 40) {
       throw new Error(language === "en" ? "The group name must be 3–40 characters long." : "Der Gruppenname muss 3–40 Zeichen lang sein.");
@@ -463,49 +425,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw new Error(language === "en" ? "A group with this name already exists. Please choose another name." : "Eine Gruppe mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.");
     }
 
-    async function createDirect(cause?: unknown) {
-      const id = crypto.randomUUID();
-      const inviteCode = `TUS${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-      const row = {
-        id,
-        owner_user_id: currentUser.id,
-        name: cleanName,
-        description: "",
-        invite_code: inviteCode,
-        is_private: groupInput.isPrivate
-      };
-      const { error: groupError } = await currentSupabase.from("groups").insert(row);
-      if (groupError) throw new Error(friendlyGroupError(groupError, language, "create"));
-      const { error: memberError } = await currentSupabase.from("group_members").insert({ group_id: id, user_id: currentUser.id, role: "owner" });
-      if (memberError) {
-        await currentSupabase.from("groups").delete().eq("id", id);
-        if (import.meta.env.DEV) console.warn("Tusiger direct create membership failed", cause, memberError);
-        throw new Error(friendlyGroupError(memberError, language, "create"));
-      }
-      return fromGroupRow({ ...row, member_count: 1, best_time_seconds: null }, "owner");
-    }
-
     const rpcResult = await supabase.rpc("create_group_with_invite", {
       p_name: cleanName,
       p_is_private: groupInput.isPrivate
     }).single();
 
-    let group: Group;
     if (rpcResult.error) {
       if (import.meta.env.DEV) console.warn("Tusiger create group failed", rpcResult.error);
-      const message = errorMessage(rpcResult.error).toLowerCase();
-      if (message.includes("could not find the function") || message.includes("schema cache")) {
-        group = await createDirect(rpcResult.error);
-      } else {
-        throw new Error(friendlyGroupError(rpcResult.error, language, "create"));
-      }
-    } else {
-      group = fromGroupRow(rpcResult.data as Record<string, unknown>, "owner");
-      if (!normalizeInviteCode(group.inviteCode)) {
-        group = await createDirect(new Error("legacy_group_rpc_returned_invalid_invite_code"));
-      }
+      throw new Error(friendlyGroupError(rpcResult.error, language, "create"));
     }
-
+    const group = fromGroupRow(rpcResult.data as Record<string, unknown>, "owner");
     await trackEvent("group_created");
     setGroups((current) => [group, ...current.filter((item) => item.id !== group.id)]);
     setPublicGroups((current) => current.filter((item) => item.id !== group.id));
@@ -563,16 +492,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAccount = useCallback(async () => {
     if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
-    await supabase.from("audit_logs").insert({ user_id: user.id, action: "account_deleted", entity_type: "profile", metadata: {} });
-    await supabase.from("profiles").update({
-      nickname: `deleted-${user.id.slice(0, 8)}`,
-      avatar_url: null,
-      deleted_at: new Date().toISOString()
-    }).eq("user_id", user.id);
-    await supabase.from("group_members").delete().eq("user_id", user.id);
-    await trackEvent("account_deleted");
+    const { data: files } = await supabase.storage.from("avatars").list(user.id);
+    if (files?.length) {
+      await supabase.storage.from("avatars").remove(files.map((file) => `${user.id}/${file.name}`));
+    }
+    const { error } = await supabase.rpc("delete_my_account");
+    if (error) throw error;
+    localStore.clearRuns(user.id);
     await logout();
-  }, [logout, trackEvent, user]);
+  }, [logout, user]);
 
   const value = useMemo(
     () => ({
@@ -598,6 +526,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       uploadAvatar,
       logout,
       saveRun,
+      loadLeaderboard,
       createGroup,
       joinGroup,
       leaveGroup,
@@ -605,7 +534,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trackEvent,
       refreshData
     }),
-    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, leaveGroup, legalPages, loginWithEmail, logout, profile, publicGroups, ready, refreshData, runs, saveProfile, saveRun, session, setLanguage, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
+    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, leaveGroup, legalPages, loginWithEmail, logout, profile, publicGroups, ready, refreshData, runs, saveProfile, loadLeaderboard, saveRun, session, setLanguage, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

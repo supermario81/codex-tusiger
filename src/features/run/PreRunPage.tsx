@@ -1,6 +1,7 @@
 import { Check, Footprints, LocateFixed, MapPin, Mountain, Navigation, X } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { isSensorLogEnabled, requestMotionPermission } from "../../lib/debug/sensorLog";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
 import { Button } from "../../components/ui/Button";
@@ -130,6 +131,8 @@ export function PreRunPage() {
   }
 
   function startRun(needsReview: boolean) {
+    // iOS vergisst die Bewegungsfreigabe beim Neuladen und fragt nur aus einer Geste.
+    if (isSensorLogEnabled()) void requestMotionPermission();
     stopLocationWatch();
     localStorage.setItem("tusiger.forceReview", String(needsReview));
     navigate("/run");

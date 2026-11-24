@@ -24,6 +24,13 @@ export function filterLeaderboardByTab(runs: PublicRun[], tab: "Heute" | "Woche"
   });
 }
 
+/** Beginn des Zeitraums, passend zu filterLeaderboardByTab. */
+export function leaderboardSince(tab: "Heute" | "Woche" | "Monat" | "Gesamt", now = new Date()): Date | null {
+  if (tab === "Heute") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (tab === "Gesamt") return null;
+  return new Date(now.getTime() - (tab === "Woche" ? 7 : 31) * 24 * 60 * 60 * 1000);
+}
+
 // Rangfolge IMMER erst nach dem Zeitfilter vergeben: sonst trägt der erste
 // Eintrag eines gefilterten Zeitraums den Rang aus der ungefilterten Liste.
 export function rankLeaderboard(runs: PublicRun[]): PublicRun[] {

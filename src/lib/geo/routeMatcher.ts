@@ -76,7 +76,10 @@ const jumpNoiseFloorM = 30;
 // 2,29 Stufen pro Meter am Streckenanfang sind das sofort 5-10 Stufen, bevor
 // ueberhaupt eine Stufe genommen wurde. Der hoechste dort projizierte Wert wird
 // deshalb als Nullpunkt gemerkt und spaeter abgezogen.
-const startAnchorRadiusM = 4;
+const startAnchorRadiusM = 10;
+// Die Nullpunkt-Korrektur laeuft danach aus. Auf die ganze Strecke gestreckt
+// drueckte sie jede Marke nach unten.
+const startAnchorFadeSteps = 30;
 const maxStartAnchorSteps = 10;
 
 export type JumpFlagSample = {
@@ -424,17 +427,13 @@ export function analyzeRouteTrack(points: RunPoint[], config: ChallengeConfig): 
   let startAnchorLocked = false;
 
   // Nullpunkt-Korrektur: zieht den am Start faelschlich vergebenen Vorlauf ab
-  // und streckt den Rest wieder auf die volle Stufenzahl, damit oben exakt
-  // totalSteps stehen. Monoton und bei Anker 0 die Identitaet.
+  // und laeuft ueber die ersten Stufen aus. Monoton und bei Anker 0 die Identitaet.
   function withStartAnchor(steps: number): number {
     if (startAnchorSteps <= 0) {
       return steps;
     }
-    const span = config.totalSteps - startAnchorSteps;
-    if (span <= 0) {
-      return steps;
-    }
-    return clamp(((steps - startAnchorSteps) * config.totalSteps) / span, 0, config.totalSteps);
+    const fade = clamp(1 - (steps - startAnchorSteps) / startAnchorFadeSteps, 0, 1);
+    return clamp(steps - startAnchorSteps * fade, 0, config.totalSteps);
   }
 
   sorted.forEach((point) => {

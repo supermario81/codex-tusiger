@@ -39,7 +39,11 @@ export function SettingsPage() {
       setMessage("Bitte DELETE eingeben, um die Löschung zu bestätigen.");
       return;
     }
-    await deleteAccount();
+    try {
+      await deleteAccount();
+    } catch {
+      setMessage("Account konnte nicht gelöscht werden. Bitte erneut versuchen.");
+    }
   }
 
   return (
@@ -82,14 +86,14 @@ export function SettingsPage() {
         </GlassPanel>
         <GlassPanel>
           <h2>Account löschen</h2>
-          <p>Dein Profil wird anonymisiert, Gruppenmitgliedschaften werden entfernt und die lokale Session wird beendet. Vollständige Auth-User-Löschung benötigt eine serverseitige Admin-Funktion.</p>
+          <p>Dein Konto, dein Profil, alle Läufe samt GPS-Daten und deine Gruppenmitgliedschaften werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.</p>
           <form onSubmit={submitDelete}>
             <label className="input-wrap">
               <span>Zur Bestätigung DELETE eingeben</span>
               <input value={confirm} onChange={(event) => setConfirm(event.currentTarget.value)} />
             </label>
             {message ? <p className="form-error">{message}</p> : null}
-            <Button variant="danger" icon={<Trash2 />}>Account anonymisieren</Button>
+            <Button variant="danger" icon={<Trash2 />}>Account löschen</Button>
           </form>
         </GlassPanel>
       </section>

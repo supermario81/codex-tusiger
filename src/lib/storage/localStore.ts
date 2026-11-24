@@ -40,7 +40,8 @@ function pruneRuns(runs: RunRecord[]): RunRecord[] {
 }
 
 export const localStore = {
-  readRuns: () => readJson<RunRecord[]>(keys.runs, []),
+  // Auf geteilten Geräten sieht jedes Konto nur seine eigenen Läufe.
+  readRuns: (userId: string) => readJson<RunRecord[]>(keys.runs, []).filter((run) => run.userId === userId),
   upsertRun: (run: RunRecord) => {
     const runs = readJson<RunRecord[]>(keys.runs, []);
     const next = pruneRuns([run, ...runs.filter((item) => item.id !== run.id)]);
@@ -61,7 +62,13 @@ export const localStore = {
       }
     }
   },
-  readActiveRun: () => readJson<RunRecord | null>(keys.activeRun, null),
+  // Nur der eigene Lauf, und nur solange er noch gültig beendet werden kann —
+  // sonst wird ein vergessener Lauf Tage später fortgesetzt.
+  readActiveRun: (userId: string, maxAgeSeconds: number) => {
+    const run = readJson<RunRecord | null>(keys.activeRun, null);
+    const fresh = run && Date.now() - new Date(run.startedAt).getTime() <= maxAgeSeconds * 1000;
+    return run && fresh && run.userId === userId ? run : null;
+  },
   writeActiveRun: (run: RunRecord) => {
     try {
       writeJson(keys.activeRun, run);
@@ -84,5 +91,7 @@ export const localStore = {
       }
     }
   },
+  clearRuns: (userId: string) =>
+    writeJson(keys.runs, readJson<RunRecord[]>(keys.runs, []).filter((run) => run.userId !== userId)),
   clearActiveRun: () => localStorage.removeItem(keys.activeRun)
 };

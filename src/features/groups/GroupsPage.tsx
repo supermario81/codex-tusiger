@@ -1,11 +1,13 @@
-import { ChevronRight, Copy, LogOut, Plus, UsersRound, UserRoundPlus } from "lucide-react";
+import { CheckCircle2, ChevronRight, Copy, LogOut, Plus, UsersRound, UserRoundPlus } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
+import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
+import type { PublicRun } from "../../lib/types";
 import { formatDuration } from "../../lib/geo/geo";
 import { clearPendingInviteCode, getInviteUrl, normalizeInviteCode } from "../../lib/community/community";
 
@@ -24,7 +26,7 @@ function errorText(cause: unknown, fallback: string) {
 }
 
 export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invite" }) {
-  const { createGroup, groups, joinGroup, language, leaveGroup, publicGroups } = useApp();
+  const { createGroup, groups, joinGroup, language, leaveGroup, loadLeaderboard, publicGroups } = useApp();
   const navigate = useNavigate();
   const t = language === "en" ? {
     create: "Create group",
@@ -131,7 +133,15 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
   const [manualCopyUrl, setManualCopyUrl] = useState("");
   const [joinedGroupId, setJoinedGroupId] = useState("");
   const [publicPage, setPublicPage] = useState(1);
-  const group = groups.find((item) => item.id === groupId) ?? groups[0];
+  const group = groups.find((item) => item.id === groupId);
+  const [ranking, setRanking] = useState<PublicRun[]>([]);
+  useEffect(() => {
+    let current = true;
+    if (groupId) void loadLeaderboard(null, groupId).then((next) => current && setRanking(next));
+    return () => {
+      current = false;
+    };
+  }, [groupId, loadLeaderboard]);
   const groupNames = useMemo(() => [...groups, ...publicGroups].map((item) => item.name.trim().toLowerCase()), [groups, publicGroups]);
   const publicGroupRows = useMemo(() => {
     const myGroupIds = new Set(groups.map((item) => item.id));
@@ -380,6 +390,20 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
             <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${getInviteUrl(group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
             <Button variant="danger" icon={<LogOut />} onClick={() => void leaveCurrentGroup(group.id)}>{t.leave}</Button>
           </GlassPanel>
+          {ranking.length > 0 ? (
+            <GlassPanel className="leaderboard-list">
+              {ranking.map((run) => (
+                <article key={run.id} className={run.isCurrentUser ? "current-user" : ""}>
+                  <b>{run.rank}</b>
+                  <Avatar name={run.nickname} url={run.avatarUrl} size="sm" />
+                  <strong>{run.nickname}</strong>
+                  <span>{formatDuration(run.durationSeconds)}</span>
+                  <small>{new Date(run.date).toLocaleDateString(language === "en" ? "en-GB" : "de-CH")}</small>
+                  <CheckCircle2 />
+                </article>
+              ))}
+            </GlassPanel>
+          ) : null}
         </section>
       </PageShell>
     );
