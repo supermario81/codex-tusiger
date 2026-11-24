@@ -13,6 +13,7 @@ type AppContextValue = {
   isSupabaseConfigured: boolean;
   language: "de" | "en";
   setLanguage: (language: "de" | "en") => void;
+  t: (de: string, en: string) => string;
   session: Session | null;
   user: User | null;
   userId: string;
@@ -54,12 +55,16 @@ function getInitialLanguage(): "de" | "en" {
   return "de";
 }
 
+function tr(de: string, en: string) {
+  return getInitialLanguage() === "en" ? en : de;
+}
+
 function errorMessage(cause: unknown) {
   if (cause instanceof Error) return cause.message;
   if (cause && typeof cause === "object" && "message" in cause && typeof cause.message === "string") {
     return cause.message;
   }
-  return "Supabase konnte nicht geladen werden.";
+  return tr("Supabase konnte nicht geladen werden.", "Supabase could not be loaded.");
 }
 
 function cleanEmail(email: string) {
@@ -106,7 +111,7 @@ async function compressAvatarToWebp(file: File) {
     image.decoding = "async";
     await new Promise<void>((resolve, reject) => {
       image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Bild konnte nicht gelesen werden."));
+      image.onerror = () => reject(new Error(tr("Bild konnte nicht gelesen werden.", "Image could not be read.")));
       image.src = sourceUrl;
     });
 
@@ -118,14 +123,14 @@ async function compressAvatarToWebp(file: File) {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Avatar konnte nicht verarbeitet werden.");
+    if (!context) throw new Error(tr("Avatar konnte nicht verarbeitet werden.", "Avatar could not be processed."));
     context.drawImage(image, 0, 0, width, height);
 
     for (const quality of [0.86, 0.78, 0.7, 0.62, 0.54]) {
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
       if (blob && blob.size <= 1024 * 1024) return blob;
     }
-    throw new Error("Avatar konnte nicht unter 1 MB optimiert werden.");
+    throw new Error(tr("Avatar konnte nicht unter 1 MB optimiert werden.", "Avatar could not be optimised below 1 MB."));
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
@@ -152,6 +157,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLanguageState(nextLanguage);
     localStorage.setItem(languageKey, nextLanguage);
   }, []);
+
+  // Wahl im Profil mitspeichern, sonst stellt das nächste Laden sie zurück.
+  const changeLanguage = useCallback((nextLanguage: "de" | "en") => {
+    setLanguage(nextLanguage);
+    if (user && supabase) {
+      void supabase.from("profiles").update({ language: nextLanguage }).eq("user_id", user.id).then(() => undefined);
+    }
+  }, [setLanguage, user]);
+
+  const t = useCallback((de: string, en: string) => (language === "en" ? en : de), [language]);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   const trackEvent = useCallback(async (eventName: string, metadata: Record<string, unknown> = {}) => {
     if (!isSupabaseConfigured || !supabase) {
@@ -188,7 +207,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
-      setSetupError("Supabase ist noch nicht konfiguriert. Bitte VITE_SUPABASE_ANON_KEY als .env.local oder GitHub Secret setzen.");
+      setSetupError(tr("Supabase ist noch nicht konfiguriert. Bitte VITE_SUPABASE_ANON_KEY als .env.local oder GitHub Secret setzen.", "Supabase is not configured yet. Please set VITE_SUPABASE_ANON_KEY in .env.local or as a GitHub secret."));
       setReady(true);
       return;
     }
@@ -248,7 +267,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLeaderboard(currentSession?.user ? await loadLeaderboard(null) : []);
     } catch (cause) {
       const message = errorMessage(cause);
-      setSetupError(`Supabase Setup unvollständig: ${message}. Bitte Migration ausführen und GitHub Secret VITE_SUPABASE_ANON_KEY setzen.`);
+      setSetupError(tr(`Supabase Setup unvollständig: ${message}. Bitte Migration ausführen und GitHub Secret VITE_SUPABASE_ANON_KEY setzen.`, `Supabase setup incomplete: ${message}. Please run the migration and set the GitHub secret VITE_SUPABASE_ANON_KEY.`));
       setSession(null);
       setProfile(null);
       setRuns([]);
@@ -274,7 +293,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithEmail = useCallback(async (email: string, requestedLanguage: "de" | "en" = language) => {
     if (!isSupabaseConfigured || !supabase) {
-      throw new Error("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.");
+      throw new Error(tr("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.", "Supabase is missing: please configure VITE_SUPABASE_ANON_KEY."));
     }
     await trackEvent("login_started", { method: "email" });
     const redirectTo = `${window.location.origin}${window.location.pathname}`;
@@ -291,7 +310,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const verifyOtp = useCallback(async (email: string, token: string) => {
     if (!isSupabaseConfigured || !supabase) {
-      throw new Error("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.");
+      throw new Error(tr("Supabase fehlt: Bitte VITE_SUPABASE_ANON_KEY konfigurieren.", "Supabase is missing: please configure VITE_SUPABASE_ANON_KEY."));
     }
     const normalizedEmail = cleanEmail(email);
     const cleanToken = token.trim();
@@ -302,12 +321,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [refreshData, trackEvent]);
 
   const uploadAvatar = useCallback(async (file: File) => {
-    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    if (!user || !supabase) throw new Error(tr("Bitte zuerst einloggen.", "Please sign in first."));
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      throw new Error("Bitte JPG, PNG oder WebP verwenden.");
+      throw new Error(tr("Bitte JPG, PNG oder WebP verwenden.", "Please use JPG, PNG or WebP."));
     }
     if (file.size > 8 * 1024 * 1024) {
-      throw new Error("Avatar-Ausgangsbild darf maximal 8 MB groß sein.");
+      throw new Error(tr("Avatar-Ausgangsbild darf maximal 8 MB groß sein.", "The original avatar image may be at most 8 MB."));
     }
     const blob = await compressAvatarToWebp(file);
     const oldPath = profile?.avatarUrl ? avatarStoragePath(profile.avatarUrl) : "";
@@ -322,7 +341,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [profile?.avatarUrl, user]);
 
   const saveProfile = useCallback(async (input: { nickname: string; avatarUrl: string; language: "de" | "en"; showInPublicLeaderboard?: boolean }) => {
-    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    if (!user || !supabase) throw new Error(tr("Bitte zuerst einloggen.", "Please sign in first."));
     const nickname = input.nickname.trim();
     const { error } = await supabase.from("profiles").upsert({
       user_id: user.id,
@@ -414,7 +433,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [language, loadLeaderboard, trackEvent, user, userId]);
 
   const createGroup = useCallback(async (groupInput: Pick<Group, "name" | "description" | "isPrivate">) => {
-    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    if (!user || !supabase) throw new Error(tr("Bitte zuerst einloggen.", "Please sign in first."));
     const cleanName = groupInput.name.trim();
     if (cleanName.length < 3 || cleanName.length > 40) {
       throw new Error(language === "en" ? "The group name must be 3–40 characters long." : "Der Gruppenname muss 3–40 Zeichen lang sein.");
@@ -443,7 +462,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [groups, language, publicGroups, refreshData, trackEvent, user]);
 
   const joinGroup = useCallback(async (inviteCode: string) => {
-    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    if (!user || !supabase) throw new Error(tr("Bitte zuerst einloggen.", "Please sign in first."));
     const normalizedInviteCode = normalizeInviteCode(inviteCode);
     if (!normalizedInviteCode) {
       throw new Error(language === "en" ? "Please enter a valid invite code." : "Bitte gib einen gültigen Einladungs-Code ein.");
@@ -479,7 +498,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [groups, language, refreshData, trackEvent, user]);
 
   const leaveGroup = useCallback(async (groupId: string) => {
-    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    if (!user || !supabase) throw new Error(tr("Bitte zuerst einloggen.", "Please sign in first."));
     const { error } = await supabase.rpc("leave_tusiger_group", { p_group_id: groupId });
     if (error) {
       if (import.meta.env.DEV) console.warn("Tusiger leave group failed", error);
@@ -491,7 +510,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [language, refreshData, trackEvent, user]);
 
   const deleteAccount = useCallback(async () => {
-    if (!user || !supabase) throw new Error("Bitte zuerst einloggen.");
+    if (!user || !supabase) throw new Error(tr("Bitte zuerst einloggen.", "Please sign in first."));
     const { data: files } = await supabase.storage.from("avatars").list(user.id);
     if (files?.length) {
       await supabase.storage.from("avatars").remove(files.map((file) => `${user.id}/${file.name}`));
@@ -508,7 +527,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setupError,
       isSupabaseConfigured,
       language,
-      setLanguage,
+      setLanguage: changeLanguage,
+      t,
       session,
       user,
       userId,
@@ -534,7 +554,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trackEvent,
       refreshData
     }),
-    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, leaveGroup, legalPages, loginWithEmail, logout, profile, publicGroups, ready, refreshData, runs, saveProfile, loadLeaderboard, saveRun, session, setLanguage, setupError, trackEvent, uploadAvatar, user, userId, verifyOtp]
+    [config, createGroup, deleteAccount, groups, history, joinGroup, language, leaderboard, leaveGroup, legalPages, loginWithEmail, logout, profile, publicGroups, ready, refreshData, runs, saveProfile, loadLeaderboard, saveRun, session, changeLanguage, setupError, t, trackEvent, uploadAvatar, user, userId, verifyOtp]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

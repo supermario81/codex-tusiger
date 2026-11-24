@@ -8,7 +8,7 @@ import { GlassPanel } from "../../components/ui/Card";
 import { isSensorLogEnabled, requestMotionPermission, setSensorLogEnabled } from "../../lib/debug/sensorLog";
 
 export function SettingsPage() {
-  const { deleteAccount } = useApp();
+  const { deleteAccount, t } = useApp();
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
   const [sensorLogging, setSensorLogging] = useState(() => isSensorLogEnabled());
@@ -28,48 +28,44 @@ export function SettingsPage() {
     setSensorLogging(granted);
     setSensorNote(
       granted
-        ? "Sensor-Aufzeichnung aktiv. Der Export erscheint nach dem Lauf im Laufbericht."
-        : "Bewegungsdaten wurden nicht freigegeben. In den Safari-Einstellungen erlauben."
+        ? t("Sensor-Aufzeichnung aktiv. Der Export erscheint nach dem Lauf im Laufbericht.", "Sensor recording active. The export appears in the run report after the run.")
+        : t("Bewegungsdaten wurden nicht freigegeben. In den Safari-Einstellungen erlauben.", "Motion data was not granted. Allow it in the Safari settings.")
     );
   }
 
   async function submitDelete(event: FormEvent) {
     event.preventDefault();
     if (confirm !== "DELETE") {
-      setMessage("Bitte DELETE eingeben, um die Löschung zu bestätigen.");
+      setMessage(t("Bitte DELETE eingeben, um die Löschung zu bestätigen.", "Please type DELETE to confirm deletion."));
       return;
     }
     try {
       await deleteAccount();
     } catch {
-      setMessage("Account konnte nicht gelöscht werden. Bitte erneut versuchen.");
+      setMessage(t("Account konnte nicht gelöscht werden. Bitte erneut versuchen.", "Account could not be deleted. Please try again."));
     }
   }
 
   return (
     <PageShell back logoCelebrationTest>
       <section className="simple-page">
-        <h1>Einstellungen</h1>
+        <h1>{t("Einstellungen", "Settings")}</h1>
         <GlassPanel>
-          <h2>Datenschutz</h2>
-          <p>Öffentlich sichtbar sind nur Nickname, Avatar und gültige Laufzeiten. Deine E-Mail wird nie öffentlich angezeigt.</p>
-          <p>GPS wird nur während Pre-Run und Lauf verwendet. Aktive Läufe werden lokal zwischengespeichert, damit keine Daten verloren gehen.</p>
+          <h2>{t("Datenschutz", "Privacy")}</h2>
+          <p>{t("Öffentlich sichtbar sind nur Nickname, Avatar und gültige Laufzeiten. Deine E-Mail wird nie öffentlich angezeigt.", "Only nickname, avatar and valid run times are publicly visible. Your email is never shown publicly.")}</p>
+          <p>{t("GPS wird nur während Pre-Run und Lauf verwendet. Aktive Läufe werden lokal zwischengespeichert, damit keine Daten verloren gehen.", "GPS is only used during the pre-run check and the run. Active runs are stored locally so no data is lost.")}</p>
           <div className="legal-link-list">
-            <Link to="/legal/datenschutz">Datenschutzrichtlinie</Link>
-            <Link to="/legal/nutzungsbedingungen">Nutzungsbedingungen</Link>
-            <Link to="/legal/impressum">Impressum</Link>
-            <Link to="/legal/standort-sensoren">Standort-/Sensor-Einwilligung</Link>
+            <Link to="/legal/datenschutz">{t("Datenschutzrichtlinie", "Privacy Policy")}</Link>
+            <Link to="/legal/nutzungsbedingungen">{t("Nutzungsbedingungen", "Terms of Use")}</Link>
+            <Link to="/legal/impressum">{t("Impressum", "Imprint")}</Link>
+            <Link to="/legal/standort-sensoren">{t("Standort-/Sensor-Einwilligung", "Location/Sensor Consent")}</Link>
           </div>
         </GlassPanel>
         <GlassPanel>
-          <h2>Entwickler-Werkzeuge</h2>
-          <p>
-            Zeichnet während eines Laufs die verfügbaren Gerätesensoren auf (Beschleunigung,
-            Gyroskop, Kompass, GPS) und stellt sie im Laufbericht als CSV zum Export bereit.
-            Nur für Testläufe gedacht — im Normalbetrieb ausgeschaltet lassen.
-          </p>
+          <h2>{t("Entwickler-Werkzeuge", "Developer tools")}</h2>
+          <p>{t("Zeichnet während eines Laufs die verfügbaren Gerätesensoren auf (Beschleunigung, Gyroskop, Kompass, GPS) und stellt sie im Laufbericht als CSV zum Export bereit. Nur für Testläufe gedacht — im Normalbetrieb ausgeschaltet lassen.", "Records the available device sensors during a run (acceleration, gyroscope, compass, GPS) and offers them as CSV in the run report. For test runs only — leave it off in normal use.")}</p>
           <label className="toggle-line">
-            <span><strong><Activity size={18} aria-hidden /> Sensordaten aufzeichnen</strong></span>
+            <span><strong><Activity size={18} aria-hidden /> {t("Sensordaten aufzeichnen", "Record sensor data")}</strong></span>
             <input
               type="checkbox"
               checked={sensorLogging}
@@ -77,23 +73,19 @@ export function SettingsPage() {
             />
           </label>
           {sensorNote ? <small>{sensorNote}</small> : null}
-          <p>
-            Für die Streckenvermessung: einmal abgehen und jeden Übergang zwischen
-            Treppe und stufenlosem Weg markieren. Daraus entsteht das Routenmodell
-            mit exakter Stufenzahl je Abschnitt.
-          </p>
-          <Link className="action-row" to="/calibration"><Footprints /> Streckenkalibrierung</Link>
+          <p>{t("Für die Streckenvermessung: einmal abgehen und jeden Übergang zwischen Treppe und stufenlosem Weg markieren. Daraus entsteht das Routenmodell mit exakter Stufenzahl je Abschnitt.", "For surveying the route: walk it once and mark every transition between stairs and step-free path. This creates the route model with exact step counts per section.")}</p>
+          <Link className="action-row" to="/calibration"><Footprints /> {t("Streckenkalibrierung", "Route calibration")}</Link>
         </GlassPanel>
         <GlassPanel>
-          <h2>Account löschen</h2>
-          <p>Dein Konto, dein Profil, alle Läufe samt GPS-Daten und deine Gruppenmitgliedschaften werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.</p>
+          <h2>{t("Account löschen", "Delete account")}</h2>
+          <p>{t("Dein Konto, dein Profil, alle Läufe samt GPS-Daten und deine Gruppenmitgliedschaften werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.", "Your account, profile, all runs including GPS data and your group memberships will be permanently deleted. This cannot be undone.")}</p>
           <form onSubmit={submitDelete}>
             <label className="input-wrap">
-              <span>Zur Bestätigung DELETE eingeben</span>
+              <span>{t("Zur Bestätigung DELETE eingeben", "Type DELETE to confirm")}</span>
               <input value={confirm} onChange={(event) => setConfirm(event.currentTarget.value)} />
             </label>
             {message ? <p className="form-error">{message}</p> : null}
-            <Button variant="danger" icon={<Trash2 />}>Account löschen</Button>
+            <Button variant="danger" icon={<Trash2 />}>{t("Account löschen", "Delete account")}</Button>
           </form>
         </GlassPanel>
       </section>

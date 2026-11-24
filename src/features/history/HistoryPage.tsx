@@ -67,7 +67,7 @@ export function HistoryPage({ focusDonate = false }: { focusDonate?: boolean }) 
           <Heart />
         </GlassPanel>
         <GlassPanel className="ranger-card">
-          <img src={`${baseUrl}images/born-tusiger-rangers.webp`} alt="Born Rangers beim Unterhalt des 1000er-Stäglis" draggable={false} />
+          <img src={`${baseUrl}images/born-tusiger-rangers.webp`} alt={language === "en" ? "Born Rangers maintaining the 1000er-Stägli" : "Born Rangers beim Unterhalt des 1000er-Stäglis"} draggable={false} />
           <p>{t.rangerCaption}</p>
           <a href={articleUrl} target="_blank" rel="noreferrer">
             <Button variant="secondary" icon={<Newspaper />}>{t.article}</Button>

@@ -4,7 +4,7 @@ import { PageShell } from "../../components/layout/PageShell";
 import { GlassPanel } from "../../components/ui/Card";
 
 export function LegalPage() {
-  const { language, legalPages, profile, trackEvent } = useApp();
+  const { language, legalPages, profile, trackEvent, t } = useApp();
   const { slug = "datenschutz" } = useParams();
   const page =
     legalPages.find((item) => item.slug === slug && item.language === language) ??
@@ -19,7 +19,7 @@ export function LegalPage() {
         <h1>{page?.title ?? "Legal"}</h1>
         <GlassPanel>
           <p className="legal-version">Version: {page?.version ?? "draft"}</p>
-          <p>{page?.body ?? "Dieser Inhalt wird vorbereitet."}</p>
+          <p>{page?.body ?? t("Dieser Inhalt wird vorbereitet.", "This content is being prepared.")}</p>
         </GlassPanel>
         <GlassPanel className="legal-links">
           <Link to="/legal/datenschutz">{language === "en" ? "Privacy" : "Datenschutz"}</Link>

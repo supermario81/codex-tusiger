@@ -1,15 +1,17 @@
 import { CheckCircle2, Clock3, XCircle } from "lucide-react";
+import { useApp } from "../../app/AppContext";
 import type { ValidationStatus } from "../../lib/types";
 
 export function ValidationBadge({ status }: { status: ValidationStatus }) {
+  const { t } = useApp();
   const label =
     status === "valid"
-      ? "Gültig geprüft"
+      ? t("Gültig geprüft", "Validated")
       : status === "needs_review"
-        ? "In Prüfung"
+        ? t("In Prüfung", "In review")
         : status === "invalid"
-          ? "Ungültig"
-          : "Entwurf";
+          ? t("Ungültig", "Invalid")
+          : t("Entwurf", "Draft");
   const Icon = status === "valid" ? CheckCircle2 : status === "invalid" ? XCircle : Clock3;
   return (
     <span className={`status-badge status-${status}`}>

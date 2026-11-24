@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, Home } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useApp } from "../../app/AppContext";
 import { BottomNav } from "./BottomNav";
 import { LanguageSwitcher } from "../ui/LanguageSwitcher";
 import { CelebrationTestTrigger } from "../ui/Confetti";
@@ -21,6 +22,7 @@ export function PageShell({
   compactLogo?: boolean;
   logoCelebrationTest?: boolean;
 }) {
+  const { t } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const showHome =
@@ -37,12 +39,12 @@ export function PageShell({
         {back || showHome ? (
           <div className="shell-actions">
             {back ? (
-              <button className="shell-action-button" type="button" onClick={() => navigate(-1)} aria-label="Zurück">
+              <button className="shell-action-button" type="button" onClick={() => navigate(-1)} aria-label={t("Zurück", "Back")}>
                 <ArrowLeft />
               </button>
             ) : null}
             {showHome ? (
-              <button className="shell-action-button" type="button" onClick={() => navigate("/")} aria-label="Zur Startseite">
+              <button className="shell-action-button" type="button" onClick={() => navigate("/")} aria-label={t("Zur Startseite", "To start")}>
                 <Home />
               </button>
             ) : null}

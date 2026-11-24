@@ -29,7 +29,7 @@ function compactTrackingSummary(summary: RouteTrackSummary, telemetryLimit = 160
 }
 
 export function RunPage() {
-  const { config, profile, saveRun, userId } = useApp();
+  const { config, profile, saveRun, userId, t, language } = useApp();
   const navigate = useNavigate();
   const [restoredRun] = useState(() => localStore.readActiveRun(userId, config.maxDurationSeconds));
   const [startedAt] = useState(() => restoredRun?.startedAt ?? new Date().toISOString());
@@ -235,7 +235,7 @@ export function RunPage() {
 
   const latestPoint = fullPoints.at(-1) ?? null;
   const gpsOk = tracking.confidenceLevel === "high" || (tracking.confidenceLevel === "estimated" && Boolean(latestPoint));
-  const gpsLabel = tracking.confidenceLevel === "high" ? "GPS OK" : tracking.confidenceLevel === "estimated" ? "GPS geschätzt" : "GPS ungenau";
+  const gpsLabel = tracking.confidenceLevel === "high" ? "GPS OK" : tracking.confidenceLevel === "estimated" ? t("GPS geschätzt", "GPS estimated") : t("GPS ungenau", "GPS inaccurate");
   const steps = tracking.finalSteps;
   const pacePer100 = steps > 0 ? elapsed / (steps / 100) : null;
   // Die grosse Zahl folgt der Messung in menschlicher Kadenz (siehe
@@ -257,7 +257,7 @@ export function RunPage() {
     );
     return () => window.clearTimeout(timer);
   }, [displayedSteps, steps]);
-  const coach = motivationMessages.find((item) => steps >= item.minSteps && steps < item.maxSteps)?.message ?? "Du hast es gleich geschafft.";
+  const coach = motivationMessages.find((item) => steps >= item.minSteps && steps < item.maxSteps)?.[language === "en" ? "messageEn" : "message"] ?? t("Du hast es gleich geschafft.", "You are almost there.");
   // Live-Höhenmeter relativ zur stabilen Start-Referenz (geglättet über die
   // letzten 3 Höhenwerte), nicht relativ zu einem Pufferanfang.
   const recentAltitude = medianValue(
@@ -351,7 +351,7 @@ export function RunPage() {
     } catch (error) {
       isFinishingRef.current = false;
       setIsFinishing(false);
-      setFinishError(error instanceof Error ? error.message : "Lauf konnte nicht gespeichert werden.");
+      setFinishError(error instanceof Error ? error.message : t("Lauf konnte nicht gespeichert werden.", "Run could not be saved."));
       debugRunEvent("finish_save_failed", { message: error instanceof Error ? error.message : String(error) });
     }
   }
@@ -397,20 +397,20 @@ export function RunPage() {
     <PageShell nav={false} dark>
       <section className="run-page">
         <h1>TUSIGER</h1>
-        <p>Aktiver Lauf</p>
+        <p>{t("Aktiver Lauf", "Active run")}</p>
         <div className="run-dashboard">
           <header><span className={`live-dot ${gpsOk ? "" : "warn"}`} /> {gpsLabel} <span>+{altitudeGain} m</span></header>
           <strong className="big-timer">{formatDuration(elapsed)}</strong>
-          <small>Zeit</small>
+          <small>{t("Zeit", "Time")}</small>
           <b>{displayedSteps} / {config.totalSteps}</b>
-          <span>Stufen</span>
+          <span>{t("Stufen", "Steps")}</span>
           <ProgressBar value={displayedSteps} max={config.totalSteps} />
           <div className="run-metrics">
-            <span><Timer /> Pace / 100<br /><strong>{formatPace(pacePer100)}</strong></span>
-            <span>GPS Punkte<br /><strong>{fullPoints.length}</strong></span>
-            <span>Höhenmeter<br /><strong>{altitudeGain}</strong></span>
+            <span><Timer /> Pace / 100<br /><strong>{formatPace(pacePer100, language)}</strong></span>
+            <span>{t("GPS Punkte", "GPS points")}<br /><strong>{fullPoints.length}</strong></span>
+            <span>{t("Höhenmeter", "Elevation")}<br /><strong>{altitudeGain}</strong></span>
           </div>
-          <p className="run-hint">Handy nicht sperren, sonst stoppt die Aufzeichnung.</p>
+          <p className="run-hint">{t("Handy nicht sperren, sonst stoppt die Aufzeichnung.", "Do not lock your phone, otherwise recording stops.")}</p>
         </div>
         <CoachMessage message={coach} />
         <button
@@ -425,17 +425,17 @@ export function RunPage() {
           onPointerLeave={cancelHold}
           style={{ background: `linear-gradient(90deg, #8d4a37 ${holdProgress * 100}%, rgba(112,54,40,.86) ${holdProgress * 100}%)` }}
         >
-          <span><Square /></span> {isFinishing ? "Speichern..." : "Lauf beenden"}
+          <span><Square /></span> {isFinishing ? t("Speichern...", "Saving...") : t("Lauf beenden", "Finish run")}
         </button>
         {finishError ? <p className="form-error">{finishError}</p> : null}
         {confirmStop ? (
-          <div className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Lauf beenden bestätigen">
+          <div className="confirm-sheet" role="dialog" aria-modal="true" aria-label={t("Lauf beenden bestätigen", "Confirm finishing the run")}>
             <div>
-              <h2>Lauf beenden?</h2>
-              <p>Tippe bestätigen oder halte den roten Button 1.2 Sekunden gedrückt.</p>
-              <button type="button" onClick={() => setConfirmStop(false)}>Weiterlaufen</button>
+              <h2>{t("Lauf beenden?", "Finish run?")}</h2>
+              <p>{t("Tippe bestätigen oder halte den roten Button 1.2 Sekunden gedrückt.", "Tap confirm or hold the red button for 1.2 seconds.")}</p>
+              <button type="button" onClick={() => setConfirmStop(false)}>{t("Weiterlaufen", "Keep running")}</button>
               <button type="button" disabled={isFinishing} onClick={() => void finishRun("confirm")}>
-                {isFinishing ? "Speichern..." : "Beenden bestätigen"}
+                {isFinishing ? t("Speichern...", "Saving...") : t("Beenden bestätigen", "Confirm finish")}
               </button>
             </div>
           </div>

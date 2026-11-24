@@ -19,11 +19,11 @@ import { readPendingInviteCode, savePendingInviteCode } from "../lib/community/c
 import { useApp } from "./AppContext";
 
 function Gate({ children }: { children: React.ReactNode }) {
-  const { profile, ready, setupError, user } = useApp();
+  const { profile, ready, setupError, user, t } = useApp();
   const location = useLocation();
 
   if (!ready) {
-    return <div className="boot-screen">Tusiger wird geladen...</div>;
+    return <div className="boot-screen">{t("Tusiger wird geladen...", "Loading Tusiger...")}</div>;
   }
 
   if (setupError && !user) {
@@ -46,8 +46,8 @@ function Gate({ children }: { children: React.ReactNode }) {
 }
 
 function PublicStart() {
-  const { profile, ready, user } = useApp();
-  if (!ready) return <div className="boot-screen">Tusiger wird geladen...</div>;
+  const { profile, ready, user, t } = useApp();
+  if (!ready) return <div className="boot-screen">{t("Tusiger wird geladen...", "Loading Tusiger...")}</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile) return <Navigate to="/setup-profile" replace />;
   const pendingInviteCode = readPendingInviteCode();

@@ -198,6 +198,7 @@ export type MotivationMessage = {
   maxSteps: number;
   intensity: number;
   message: string;
+  messageEn: string;
 };
 
 export type ValidationResult = {

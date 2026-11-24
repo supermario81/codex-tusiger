@@ -11,9 +11,9 @@ const items = [
 ];
 
 export function BottomNav() {
-  const { language } = useApp();
+  const { language, t } = useApp();
   return (
-    <nav className="bottom-nav" aria-label="Hauptnavigation">
+    <nav className="bottom-nav" aria-label={t("Hauptnavigation", "Main navigation")}>
       {items.map((item) => {
         const Icon = item.icon;
         return (

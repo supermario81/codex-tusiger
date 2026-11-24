@@ -164,10 +164,10 @@ export function formatDuration(totalSeconds: number): string {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
-export function formatPace(seconds: number | null): string {
+export function formatPace(seconds: number | null, language: "de" | "en" = "de"): string {
   if (seconds === null || !Number.isFinite(seconds)) {
     return "–";
   }
 
-  return `${formatDuration(seconds)} / 100 Stufen`;
+  return `${formatDuration(seconds)} / 100 ${language === "en" ? "steps" : "Stufen"}`;
 }

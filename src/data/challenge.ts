@@ -25,23 +25,24 @@ export const defaultChallengeConfig: ChallengeConfig = {
 };
 
 export const motivationMessages: MotivationMessage[] = [
-  { minSteps: 0, maxSteps: 100, intensity: 1, message: "Starker Start. Finde deinen Rhythmus." },
-  { minSteps: 100, maxSteps: 200, intensity: 1, message: "Ruhig bleiben. Jeder Schritt zählt." },
-  { minSteps: 200, maxSteps: 300, intensity: 2, message: "Dranbleiben. Du bist im Flow." },
-  { minSteps: 300, maxSteps: 400, intensity: 2, message: "Stabil. Genau so weiter." },
-  { minSteps: 400, maxSteps: 500, intensity: 3, message: "Du hast den Berg im Griff." },
-  { minSteps: 500, maxSteps: 600, intensity: 3, message: "Halbzeit. Jetzt beginnt der echte Tusiger." },
-  { minSteps: 600, maxSteps: 700, intensity: 4, message: "Nicht nachlassen. Du bist stärker als du denkst." },
-  { minSteps: 700, maxSteps: 800, intensity: 4, message: "Jetzt zählt Fokus." },
-  { minSteps: 800, maxSteps: 900, intensity: 5, message: "Letzte Meter rücken näher. Sauber weiter." },
-  { minSteps: 900, maxSteps: 1000, intensity: 5, message: "Oben wartet deine Zeit." },
-  { minSteps: 1000, maxSteps: 1100, intensity: 6, message: "Finish-Zone. Zieh durch." },
-  { minSteps: 1100, maxSteps: 1151, intensity: 6, message: "Du hast es gleich geschafft." }
+  { minSteps: 0, maxSteps: 100, intensity: 1, message: "Starker Start. Finde deinen Rhythmus.", messageEn: "Strong start. Find your rhythm." },
+  { minSteps: 100, maxSteps: 200, intensity: 1, message: "Ruhig bleiben. Jeder Schritt zählt.", messageEn: "Stay calm. Every step counts." },
+  { minSteps: 200, maxSteps: 300, intensity: 2, message: "Dranbleiben. Du bist im Flow.", messageEn: "Keep going. You are in the flow." },
+  { minSteps: 300, maxSteps: 400, intensity: 2, message: "Stabil. Genau so weiter.", messageEn: "Steady. Just like that." },
+  { minSteps: 400, maxSteps: 500, intensity: 3, message: "Du hast den Berg im Griff.", messageEn: "You have the mountain under control." },
+  { minSteps: 500, maxSteps: 600, intensity: 3, message: "Halbzeit. Jetzt beginnt der echte Tusiger.", messageEn: "Halfway. Now the real Tusiger begins." },
+  { minSteps: 600, maxSteps: 700, intensity: 4, message: "Nicht nachlassen. Du bist stärker als du denkst.", messageEn: "Don't let up. You are stronger than you think." },
+  { minSteps: 700, maxSteps: 800, intensity: 4, message: "Jetzt zählt Fokus.", messageEn: "Now focus counts." },
+  { minSteps: 800, maxSteps: 900, intensity: 5, message: "Letzte Meter rücken näher. Sauber weiter.", messageEn: "The last metres are getting closer. Keep it clean." },
+  { minSteps: 900, maxSteps: 1000, intensity: 5, message: "Oben wartet deine Zeit.", messageEn: "Your time is waiting at the top." },
+  { minSteps: 1000, maxSteps: 1100, intensity: 6, message: "Finish-Zone. Zieh durch.", messageEn: "Finish zone. Push through." },
+  { minSteps: 1100, maxSteps: 1151, intensity: 6, message: "Du hast es gleich geschafft.", messageEn: "You are almost there." }
 ];
 
 export const historyFallback: HistoryItem[] = [
   {
     id: "history-2021",
+    language: "de",
     slug: "1904",
     sortOrder: 1,
     yearLabel: "1904",
@@ -50,6 +51,7 @@ export const historyFallback: HistoryItem[] = [
   },
   {
     id: "history-2022",
+    language: "de",
     slug: "1960",
     sortOrder: 2,
     yearLabel: "1960",
@@ -58,6 +60,7 @@ export const historyFallback: HistoryItem[] = [
   },
   {
     id: "history-1986",
+    language: "de",
     slug: "1986",
     sortOrder: 3,
     yearLabel: "1986",
@@ -66,6 +69,7 @@ export const historyFallback: HistoryItem[] = [
   },
   {
     id: "history-1987-open",
+    language: "de",
     slug: "1987",
     sortOrder: 4,
     yearLabel: "1987",
@@ -74,11 +78,57 @@ export const historyFallback: HistoryItem[] = [
   },
   {
     id: "history-1987-care",
+    language: "de",
     slug: "1987-unterhalt",
     sortOrder: 5,
     yearLabel: "1987",
     title: "Unterhalt durch Freiwillige",
     body: "Beginn mit dem Unterhalt durch Freiwillige."
+  },
+  {
+    id: "history-2021-en",
+    language: "en",
+    slug: "1904",
+    sortOrder: 1,
+    yearLabel: "1904",
+    title: "Commissioning",
+    body: "Commissioning of the pressure pipeline and the Born stairs."
+  },
+  {
+    id: "history-2022-en",
+    language: "en",
+    slug: "1960",
+    sortOrder: 2,
+    yearLabel: "1960",
+    title: "Dismantling",
+    body: "Dismantling of the pressure pipeline and beginning decay of the stairs."
+  },
+  {
+    id: "history-1986-en",
+    language: "en",
+    slug: "1986",
+    sortOrder: 3,
+    yearLabel: "1986",
+    title: "Reconstruction",
+    body: "Reconstruction of the Stägli by Herbert Scheidegger from Aarburg, known as «Born-Hörbi»."
+  },
+  {
+    id: "history-1987-open-en",
+    language: "en",
+    slug: "1987",
+    sortOrder: 4,
+    yearLabel: "1987",
+    title: "Opening",
+    body: "Opening of the Stägli, today 1150 steps."
+  },
+  {
+    id: "history-1987-care-en",
+    language: "en",
+    slug: "1987-unterhalt",
+    sortOrder: 5,
+    yearLabel: "1987",
+    title: "Volunteer maintenance",
+    body: "Start of maintenance by volunteers."
   }
 ];
 

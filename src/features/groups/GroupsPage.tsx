@@ -387,7 +387,7 @@ export function GroupsPage({ mode }: { mode?: "new" | "join" | "detail" | "invit
             {success ? <p className="form-success">{success}</p> : null}
             <Button variant="secondary" icon={<Copy />} onClick={() => void copyInviteLink(group.inviteCode)}>{copied === group.inviteCode ? t.copied : t.copy}</Button>
             {manualCopyUrl ? <input className="copy-fallback" data-invite-copy-field readOnly value={manualCopyUrl} /> : null}
-            <a href={`https://wa.me/?text=${encodeURIComponent(`Komm in meine Tusiger-Gruppe: ${getInviteUrl(group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
+            <a href={`https://wa.me/?text=${encodeURIComponent(`${language === "en" ? "Join my Tusiger group" : "Komm in meine Tusiger-Gruppe"}: ${getInviteUrl(group.inviteCode)}`)}`} target="_blank" rel="noreferrer"><Button variant="glass">{t.shareWhatsapp}</Button></a>
             <Button variant="danger" icon={<LogOut />} onClick={() => void leaveCurrentGroup(group.id)}>{t.leave}</Button>
           </GlassPanel>
           {ranking.length > 0 ? (

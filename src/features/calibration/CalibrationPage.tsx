@@ -22,7 +22,7 @@ function downloadFile(content: string, fileName: string) {
 }
 
 export function CalibrationPage() {
-  const { config, profile } = useApp();
+  const { config, profile, t } = useApp();
   const [recording, setRecording] = useState(false);
   const [marks, setMarks] = useState<CalibrationMark[]>([]);
   const [sectionKind, setSectionKind] = useState<"stairs" | "path">("path");
@@ -30,7 +30,7 @@ export function CalibrationPage() {
   const [trackPoints, setTrackPoints] = useState(0);
   const [pendingSteps, setPendingSteps] = useState("");
   const [askSteps, setAskSteps] = useState(false);
-  const [note, setNote] = useState("Noch nicht gestartet.");
+  const [note, setNote] = useState<[string, string]>(["Noch nicht gestartet.", "Not started yet."]);
   const watchId = useRef<number | null>(null);
   const walkId = useRef("");
 
@@ -56,7 +56,7 @@ export function CalibrationPage() {
 
   async function startWalk() {
     if (!navigator.geolocation) {
-      setNote("Dieser Browser unterstützt keine Geolocation.");
+      setNote(["Dieser Browser unterstützt keine Geolocation.", "This browser does not support geolocation."]);
       return;
     }
     walkId.current = crypto.randomUUID();
@@ -66,7 +66,7 @@ export function CalibrationPage() {
       sensorLog.start(walkId.current, config.id);
     }
     setRecording(true);
-    setNote("Kalibriergang läuft. Markiere jeden Übergang.");
+    setNote(["Kalibriergang läuft. Markiere jeden Übergang.", "Calibration walk running. Mark every transition."]);
     stopWatch();
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -79,7 +79,7 @@ export function CalibrationPage() {
         });
         sync();
       },
-      () => setNote("GPS-Signal wird gesucht..."),
+      () => setNote(["GPS-Signal wird gesucht...", "Searching for GPS signal..."]),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 }
     );
   }
@@ -89,16 +89,16 @@ export function CalibrationPage() {
     calibrationLog.stop();
     sensorLog.stop();
     setRecording(false);
-    setNote("Kalibriergang beendet. Jetzt die CSV-Dateien exportieren.");
+    setNote(["Kalibriergang beendet. Jetzt die CSV-Dateien exportieren.", "Calibration walk finished. Now export the CSV files."]);
   }
 
   function toggleSection() {
     if (sectionKind === "path") {
       if (!calibrationLog.startStairs()) {
-        setNote("Noch kein GPS-Punkt vorhanden — kurz warten.");
+        setNote(["Noch kein GPS-Punkt vorhanden — kurz warten.", "No GPS point yet — wait a moment."]);
         return;
       }
-      setNote(`Treppenabschnitt ${calibrationLog.currentSectionIndex} läuft.`);
+      setNote([`Treppenabschnitt ${calibrationLog.currentSectionIndex} läuft.`, `Stair section ${calibrationLog.currentSectionIndex} running.`]);
       sync();
       return;
     }
@@ -117,15 +117,15 @@ export function CalibrationPage() {
     setAskSteps(false);
     setNote(
       valid
-        ? `Abschnitt bis Stufe ${parsed} gespeichert (${mark?.sectionSteps ?? parsed - previous} Stufen).`
-        : "Abschnitt ohne Zählerstand gespeichert — bitte in der CSV nachtragen."
+        ? [`Abschnitt bis Stufe ${parsed} gespeichert (${mark?.sectionSteps ?? parsed - previous} Stufen).`, `Section up to step ${parsed} saved (${mark?.sectionSteps ?? parsed - previous} steps).`]
+        : ["Abschnitt ohne Zählerstand gespeichert — bitte in der CSV nachtragen.", "Section saved without a count — please add it in the CSV."]
     );
     sync();
   }
 
   function addMarker() {
     if (!calibrationLog.addStepMarker(stepsPerMarker)) {
-      setNote("Noch kein GPS-Punkt vorhanden — kurz warten.");
+      setNote(["Noch kein GPS-Punkt vorhanden — kurz warten.", "No GPS point yet — wait a moment."]);
       return;
     }
     sync();
@@ -134,7 +134,7 @@ export function CalibrationPage() {
   function undo() {
     calibrationLog.undoLast();
     sync();
-    setNote("Letzte Markierung entfernt.");
+    setNote(["Letzte Markierung entfernt.", "Last mark removed."]);
   }
 
   const stairSections = marks.filter((mark) => mark.kind === "stairs_end");
@@ -146,15 +146,15 @@ export function CalibrationPage() {
   return (
     <PageShell back nav={false}>
       <section className="pre-run">
-        <h1>Streckenkalibrierung</h1>
-        <p>Strecke einmal abgehen und jeden Übergang markieren</p>
+        <h1>{t("Streckenkalibrierung", "Route calibration")}</h1>
+        <p>{t("Strecke einmal abgehen und jeden Übergang markieren", "Walk the route once and mark every transition")}</p>
 
         <GlassPanel className="check-list">
           <article>
             <span className="round-icon"><LocateFixed aria-hidden /></span>
             <div>
-              <strong>{recording ? "Aufzeichnung läuft" : "Bereit"}</strong>
-              <small>{note}</small>
+              <strong>{recording ? t("Aufzeichnung läuft", "Recording") : t("Bereit", "Ready")}</strong>
+              <small>{t(...note)}</small>
             </div>
             <span className={`check-dot ${recording ? "ok" : "warn"}`}>
               {recording ? <Check /> : <Square />}
@@ -163,10 +163,10 @@ export function CalibrationPage() {
           <article>
             <span className="round-icon"><Footprints aria-hidden /></span>
             <div>
-              <strong>{sectionKind === "stairs" ? "Auf der Treppe" : "Stufenloser Weg"}</strong>
+              <strong>{sectionKind === "stairs" ? t("Auf der Treppe", "On the stairs") : t("Stufenloser Weg", "Step-free path")}</strong>
               <small>
-                Abschnitt {calibrationLog.currentSectionIndex} · {marks.length} Markierungen ·{" "}
-                {trackPoints} GPS-Punkte
+                {t("Abschnitt", "Section")} {calibrationLog.currentSectionIndex} · {marks.length} {t("Markierungen", "marks")} ·{" "}
+                {trackPoints} {t("GPS-Punkte", "GPS points")}
               </small>
             </div>
             <span className={`check-dot ${sectionKind === "stairs" ? "ok" : "warn"}`}>
@@ -176,7 +176,7 @@ export function CalibrationPage() {
         </GlassPanel>
 
         {!recording ? (
-          <Button icon={<LocateFixed />} onClick={() => void startWalk()}>Kalibriergang starten</Button>
+          <Button icon={<LocateFixed />} onClick={() => void startWalk()}>{t("Kalibriergang starten", "Start calibration walk")}</Button>
         ) : (
           <>
             <Button
@@ -184,31 +184,31 @@ export function CalibrationPage() {
               variant={sectionKind === "stairs" ? "danger" : "primary"}
               onClick={toggleSection}
             >
-              {sectionKind === "stairs" ? "Stufen enden hier" : "Stufen beginnen hier"}
+              {sectionKind === "stairs" ? t("Stufen enden hier", "Steps end here") : t("Stufen beginnen hier", "Steps begin here")}
             </Button>
             <Button variant="secondary" icon={<Check />} onClick={addMarker} disabled={sectionKind !== "stairs"}>
-              +{stepsPerMarker} Stufen ({markerSteps})
+              +{stepsPerMarker} {t("Stufen", "steps")} ({markerSteps})
             </Button>
             <Button variant="glass" icon={<Undo2 />} onClick={undo} disabled={marks.length === 0}>
-              Letzte Markierung zurück
+              {t("Letzte Markierung zurück", "Undo last mark")}
             </Button>
-            <Button variant="secondary" icon={<Square />} onClick={stopWalk}>Kalibriergang beenden</Button>
+            <Button variant="secondary" icon={<Square />} onClick={stopWalk}>{t("Kalibriergang beenden", "Finish calibration walk")}</Button>
           </>
         )}
 
         {marks.length > 0 ? (
           <GlassPanel className="details-list">
-            <h2>Abschnitte</h2>
+            <h2>{t("Abschnitte", "Sections")}</h2>
             {stairSections.length === 0 ? (
-              <p>Noch kein Treppenabschnitt abgeschlossen.</p>
+              <p>{t("Noch kein Treppenabschnitt abgeschlossen.", "No stair section completed yet.")}</p>
             ) : (
               stairSections.map((mark) => (
                 <p key={mark.index} className="check-row">
                   <Footprints />
                   <span className="check-text">
-                    <strong>Treppenabschnitt {mark.sectionIndex - 1}</strong>
+                    <strong>{t("Treppenabschnitt", "Stair section")} {mark.sectionIndex - 1}</strong>
                     <small>
-                      bis Stufe {mark.cumulativeSteps ?? "?"} · {mark.lat.toFixed(6)}, {mark.lng.toFixed(6)}
+                      {t("bis Stufe", "up to step")} {mark.cumulativeSteps ?? "?"} · {mark.lat.toFixed(6)}, {mark.lng.toFixed(6)}
                     </small>
                   </span>
                   <b>{mark.sectionSteps ?? "?"}</b>
@@ -216,7 +216,7 @@ export function CalibrationPage() {
               ))
             )}
             <p>
-              <Footprints /> Summe erfasster Stufen
+              <Footprints /> {t("Summe erfasster Stufen", "Total recorded steps")}
               <span>{totalCountedSteps} / {config.totalSteps}</span>
             </p>
           </GlassPanel>
@@ -229,14 +229,14 @@ export function CalibrationPage() {
               icon={<Download />}
               onClick={() => downloadFile(calibrationLog.marksCsv(), `tusiger-calibration-marks-${calibrationLog.id}.csv`)}
             >
-              Markierungen als CSV
+              {t("Markierungen als CSV", "Marks as CSV")}
             </Button>
             <Button
               variant="glass"
               icon={<Download />}
               onClick={() => downloadFile(calibrationLog.trackCsv(), `tusiger-calibration-track-${calibrationLog.id}.csv`)}
             >
-              GPS-Spur als CSV ({trackPoints} Punkte)
+              {t("GPS-Spur als CSV", "GPS track as CSV")} ({trackPoints} {t("Punkte", "points")})
             </Button>
             {sensorLog.hasDataFor(calibrationLog.id) ? (
               <Button
@@ -244,23 +244,24 @@ export function CalibrationPage() {
                 icon={<Download />}
                 onClick={() => downloadFile(sensorLog.toCsv(), `tusiger-calibration-sensors-${calibrationLog.id}.csv`)}
               >
-                Sensordaten als CSV ({sensorLog.sampleCount} Messungen)
+                {t("Sensordaten als CSV", "Sensor data as CSV")} ({sensorLog.sampleCount} {t("Messungen", "samples")})
               </Button>
             ) : null}
           </>
         ) : null}
 
         {askSteps ? (
-          <div className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Stufenzahl eintragen">
+          <div className="confirm-sheet" role="dialog" aria-modal="true" aria-label={t("Stufenzahl eintragen", "Enter step count")}>
             <div>
-              <h2>Bei welcher Stufe hat der Abschnitt geendet?</h2>
+              <h2>{t("Bei welcher Stufe hat der Abschnitt geendet?", "At which step did the section end?")}</h2>
               <p>
-                Dein Zählerstand insgesamt, nicht die Stufen dieses Abschnitts. Letzter
-                bestätigter Stand: {calibrationLog.lastConfirmedSteps}. Aus den 50er-Marken
-                gezählt: {markerSteps}. Leer lassen, wenn du es nachtragen willst.
+                {t(
+                  `Dein Zählerstand insgesamt, nicht die Stufen dieses Abschnitts. Letzter bestätigter Stand: ${calibrationLog.lastConfirmedSteps}. Aus den 50er-Marken gezählt: ${markerSteps}. Leer lassen, wenn du es nachtragen willst.`,
+                  `Your total count, not the steps of this section. Last confirmed count: ${calibrationLog.lastConfirmedSteps}. Counted from the 50-step marks: ${markerSteps}. Leave empty to add it later.`
+                )}
               </p>
               <label className="input-wrap">
-                <span>Zählerstand am Ende des Abschnitts</span>
+                <span>{t("Zählerstand am Ende des Abschnitts", "Count at the end of the section")}</span>
                 <input
                   autoFocus
                   inputMode="numeric"
@@ -268,8 +269,8 @@ export function CalibrationPage() {
                   onChange={(event) => setPendingSteps(event.currentTarget.value.replace(/\D/g, ""))}
                 />
               </label>
-              <button type="button" onClick={() => setAskSteps(false)}>Abbrechen</button>
-              <button type="button" onClick={confirmSectionSteps}>Abschnitt speichern</button>
+              <button type="button" onClick={() => setAskSteps(false)}>{t("Abbrechen", "Cancel")}</button>
+              <button type="button" onClick={confirmSectionSteps}>{t("Abschnitt speichern", "Save section")}</button>
             </div>
           </div>
         ) : null}

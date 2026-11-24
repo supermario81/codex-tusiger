@@ -13,7 +13,7 @@ import { playRunFailSound, playRunFanfare } from "../../lib/audio/runAudio";
 import { debugRunEvent } from "../../lib/debug/runDebug";
 
 export function FinishPage() {
-  const { config, userId } = useApp();
+  const { config, userId, t } = useApp();
   const runId = localStorage.getItem("tusiger.lastRunId");
   const run = localStore.readRuns(userId).find((item) => item.id === runId);
   // Erfolgserlebnis für gültige UND zu prüfende Läufe — nur hart ungültige
@@ -55,32 +55,32 @@ export function FinishPage() {
           <span className={`success-medal ${isCelebration ? (isReview ? "review" : "") : "fail"}`}>
             {isCelebration ? (isReview ? <Clock3 /> : <Check />) : <XCircle />}
           </span>
-          <h1>{isCelebration ? "DU HAST ES GESCHAFFT!" : "SORRY, DIESER LAUF IST UNGÜLTIG."}</h1>
+          <h1>{isCelebration ? t("DU HAST ES GESCHAFFT!", "YOU MADE IT!") : t("SORRY, DIESER LAUF IST UNGÜLTIG.", "SORRY, THIS RUN IS INVALID.")}</h1>
           <p>
             {isCelebration
               ? isReview
-                ? `Alle ${config.totalSteps} Stufen geschafft. Dein Lauf wird noch geprüft — die Details stehen im Laufbericht.`
-                : `Du hast alle ${config.totalSteps} Stufen gemeistert.`
-              : `Dieser Lauf wurde nicht gültig abgeschlossen. Erfasste Stufen: ${run.estimatedSteps} / ${config.totalSteps}.`}
+                ? t(`Alle ${config.totalSteps} Stufen geschafft. Dein Lauf wird noch geprüft — die Details stehen im Laufbericht.`, `All ${config.totalSteps} steps done. Your run is still being reviewed — see the run report for details.`)
+                : t(`Du hast alle ${config.totalSteps} Stufen gemeistert.`, `You mastered all ${config.totalSteps} steps.`)
+              : t(`Dieser Lauf wurde nicht gültig abgeschlossen. Erfasste Stufen: ${run.estimatedSteps} / ${config.totalSteps}.`, `This run was not completed validly. Recorded steps: ${run.estimatedSteps} / ${config.totalSteps}.`)}
           </p>
-          <small>Deine Zeit</small>
+          <small>{t("Deine Zeit", "Your time")}</small>
           <strong>{formatDuration(run.durationSeconds)}</strong>
           <ValidationBadge status={run.status} />
           {isCelebration ? (
             <div className={`personal-best ${isReview ? "muted-result" : ""}`}>
               {isReview ? <Clock3 /> : <Trophy />}
-              <span>{isReview ? "Zeit (in Prüfung)" : "Persönliche Bestzeit"}</span>
+              <span>{isReview ? t("Zeit (in Prüfung)", "Time (in review)") : t("Persönliche Bestzeit", "Personal best")}</span>
               <b>{formatDuration(run.durationSeconds)}</b>
             </div>
           ) : (
             <div className="personal-best muted-result">
-              <XCircle /> <span>Nicht gewertet</span><b>{run.estimatedSteps} / {config.totalSteps}</b>
+              <XCircle /> <span>{t("Nicht gewertet", "Not ranked")}</span><b>{run.estimatedSteps} / {config.totalSteps}</b>
             </div>
           )}
         </GlassPanel>
-        <Link to={`/result/${run.id}`}><Button icon={<BarChart3 />}>Ergebnis ansehen</Button></Link>
-        <Link to="/"><Button variant="secondary" icon={<Home />}>Zur Startseite</Button></Link>
-        <Link className="action-row" to="/leaderboard">Rangliste</Link>
+        <Link to={`/result/${run.id}`}><Button icon={<BarChart3 />}>{t("Ergebnis ansehen", "View result")}</Button></Link>
+        <Link to="/"><Button variant="secondary" icon={<Home />}>{t("Zur Startseite", "To start")}</Button></Link>
+        <Link className="action-row" to="/leaderboard">{t("Rangliste", "Leaderboard")}</Link>
       </section>
     </PageShell>
   );

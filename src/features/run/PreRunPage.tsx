@@ -26,11 +26,11 @@ function pruneFixWindow(fixes: RunPoint[], next: RunPoint): RunPoint[] {
 }
 
 export function PreRunPage() {
-  const { config, profile } = useApp();
+  const { config, profile, t, language } = useApp();
   const navigate = useNavigate();
   const [state, setState] = useState<WatchState>("idle");
   const [fixes, setFixes] = useState<RunPoint[]>([]);
-  const [message, setMessage] = useState("Standort noch nicht geprüft.");
+  const [message, setMessage] = useState<[string, string]>(["Standort noch nicht geprüft.", "Location not checked yet."]);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const watchId = useRef<number | null>(null);
 
@@ -93,13 +93,13 @@ export function PreRunPage() {
   function startLocationWatch() {
     if (!navigator.geolocation) {
       setState("error");
-      setMessage("Dieser Browser unterstützt keine Geolocation.");
+      setMessage(["Dieser Browser unterstützt keine Geolocation.", "This browser does not support geolocation."]);
       return;
     }
 
     stopLocationWatch();
     setState("watching");
-    setMessage("GPS wird gestartet...");
+    setMessage(["GPS wird gestartet...", "Starting GPS..."]);
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
         const next = positionToRunPoint(position);
@@ -109,13 +109,13 @@ export function PreRunPage() {
       (error) => {
         if (error.code === error.PERMISSION_DENIED) {
           setState("error");
-          setMessage("Standortzugriff wurde abgelehnt. Bitte in den Safari-Einstellungen erlauben.");
+          setMessage(["Standortzugriff wurde abgelehnt. Bitte in den Safari-Einstellungen erlauben.", "Location access was denied. Please allow it in the Safari settings."]);
           stopLocationWatch();
           return;
         }
         // Timeout/Position unavailable: Watch läuft weiter, GPS braucht oft
         // ein paar Sekunden bis zum ersten brauchbaren Fix.
-        setMessage("GPS-Signal wird gesucht...");
+        setMessage(["GPS-Signal wird gesucht...", "Searching for GPS signal..."]);
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 }
     );
@@ -144,10 +144,10 @@ export function PreRunPage() {
   const rows: Array<{ icon: typeof MapPin; label: string; text: ReactNode; ok: boolean }> = [
     {
       icon: MapPin,
-      label: "Standort",
+      label: t("Standort", "Location"),
       text: bestFix
-        ? `Position erfasst${fixAgeSeconds === null ? "" : ` · vor ${fixAgeSeconds} s`}${fixStale ? " — veraltet, bitte erneut prüfen" : ""}`
-        : message,
+        ? `${t("Position erfasst", "Position found")}${fixAgeSeconds === null ? "" : ` · ${t(`vor ${fixAgeSeconds} s`, `${fixAgeSeconds} s ago`)}`}${fixStale ? t(" — veraltet, bitte erneut prüfen", " — outdated, please check again") : ""}`
+        : t(...message),
       ok: Boolean(bestFix) && !fixStale
     },
     {
@@ -155,34 +155,34 @@ export function PreRunPage() {
       label: "GPS",
       text: bestFix
         ? accuracyOk
-          ? `± ${Math.round(bestFix.accuracyM)} m Genauigkeit`
-          : `GPS stabilisiert sich... ± ${Math.round(bestFix.accuracyM)} m`
+          ? `± ${Math.round(bestFix.accuracyM)} m ${t("Genauigkeit", "accuracy")}`
+          : `${t("GPS stabilisiert sich...", "GPS is stabilising...")} ± ${Math.round(bestFix.accuracyM)} m`
         : state === "watching"
-          ? "GPS stabilisiert sich..."
-          : "Noch nicht geprüft",
+          ? t("GPS stabilisiert sich...", "GPS is stabilising...")
+          : t("Noch nicht geprüft", "Not checked yet"),
       ok: accuracyOk
     },
     {
       icon: Mountain,
-      label: "Höhe",
-      text: bestFix?.altitudeM != null ? `${Math.round(bestFix.altitudeM)} m ü. M.` : "Keine Höhendaten (optional)",
+      label: t("Höhe", "Altitude"),
+      text: bestFix?.altitudeM != null ? `${Math.round(bestFix.altitudeM)} m ${t("ü. M.", "a.s.l.")}` : t("Keine Höhendaten (optional)", "No altitude data (optional)"),
       ok: true
     },
     {
       icon: Footprints,
-      label: "Bewegung",
-      text: state === "watching" ? <>Bereit für GPS-<br />Aufzeichnung</> : "Startet mit dem GPS-Check",
+      label: t("Bewegung", "Motion"),
+      text: state === "watching" ? language === "en" ? "Ready for GPS recording" : <>Bereit für GPS-<br />Aufzeichnung</> : t("Startet mit dem GPS-Check", "Starts with the GPS check"),
       ok: state === "watching"
     },
     {
       icon: LocateFixed,
-      label: "Startzone",
+      label: t("Startzone", "Start zone"),
       text:
         distanceToStart === null
-          ? "Unten am Start prüfen"
+          ? t("Unten am Start prüfen", "Check at the bottom start")
           : canStart
-            ? `In der Startzone (${Math.round(distanceToStart)} m vom Referenzpunkt)`
-            : `${Math.round(distanceToStart)} m entfernt (± ${Math.round(bestFix?.accuracyM ?? 0)} m)`,
+            ? t(`In der Startzone (${Math.round(distanceToStart)} m vom Referenzpunkt)`, `In the start zone (${Math.round(distanceToStart)} m from the reference point)`)
+            : `${Math.round(distanceToStart)} m ${t("entfernt", "away")} (± ${Math.round(bestFix?.accuracyM ?? 0)} m)`,
       ok: canStart
     }
   ];
@@ -190,8 +190,8 @@ export function PreRunPage() {
   return (
     <PageShell back nav={false}>
       <section className="pre-run">
-        <h1>Bereit zum Start?</h1>
-        <p>Dein Pre-Run Check</p>
+        <h1>{t("Bereit zum Start?", "Ready to start?")}</h1>
+        <p>{t("Dein Pre-Run Check", "Your pre-run check")}</p>
         <GlassPanel className="check-list">
           {rows.map((row) => {
             const Icon = row.icon;
@@ -207,30 +207,30 @@ export function PreRunPage() {
         <GlassPanel className="zone-card">
           <div className="map-placeholder"><MapPin /></div>
           <div>
-            <small>Startzone</small>
-            <strong>Start unten</strong>
-            <span>Zone<br />{canStart ? "aktiv" : "noch nicht aktiv"}</span>
+            <small>{t("Startzone", "Start zone")}</small>
+            <strong>{t("Start unten", "Start at the bottom")}</strong>
+            <span>Zone<br />{canStart ? t("aktiv", "active") : t("noch nicht aktiv", "not active yet")}</span>
           </div>
           <p>
-            GPS: {bestFix ? `± ${Math.round(bestFix.accuracyM)} m` : "unbekannt"}
-            {stabilizing ? " — stabilisiert sich..." : ""}
+            GPS: {bestFix ? `± ${Math.round(bestFix.accuracyM)} m` : t("unbekannt", "unknown")}
+            {stabilizing ? t(" — stabilisiert sich...", " — stabilising...") : ""}
           </p>
         </GlassPanel>
-        <p className="pre-run-hint"><strong>Handy während des Laufs nicht sperren.</strong> Sonst stoppt die Aufzeichnung.</p>
+        <p className="pre-run-hint"><strong>{t("Handy während des Laufs nicht sperren.", "Do not lock your phone during the run.")}</strong> {t("Sonst stoppt die Aufzeichnung.", "Otherwise recording stops.")}</p>
         {state !== "watching" ? (
-          <Button icon={<LocateFixed />} onClick={startLocationWatch}>Standort prüfen</Button>
+          <Button icon={<LocateFixed />} onClick={startLocationWatch}>{t("Standort prüfen", "Check location")}</Button>
         ) : (
           <>
-            <Button disabled={!canStart} icon={<Footprints />} onClick={() => startRun(false)}>Starten</Button>
+            <Button disabled={!canStart} icon={<Footprints />} onClick={() => startRun(false)}>{t("Starten", "Start")}</Button>
             <Button variant="secondary" icon={<LocateFixed />} onClick={recheckLocation}>
-              Standort erneut prüfen
+              {t("Standort erneut prüfen", "Check location again")}
             </Button>
           </>
         )}
         {state === "watching" && stabilizing ? (
-          <p className="pre-run-hint">GPS stabilisiert sich... ± {Math.round(bestFix?.accuracyM ?? 0)} m — ein paar Sekunden warten hilft.</p>
+          <p className="pre-run-hint">{t("GPS stabilisiert sich...", "GPS is stabilising...")} ± {Math.round(bestFix?.accuracyM ?? 0)} m — {t("ein paar Sekunden warten hilft.", "waiting a few seconds helps.")}</p>
         ) : null}
-        <button className="text-link" type="button" onClick={() => startRun(true)}>Trotzdem starten</button>
+        <button className="text-link" type="button" onClick={() => startRun(true)}>{t("Trotzdem starten", "Start anyway")}</button>
       </section>
     </PageShell>
   );
