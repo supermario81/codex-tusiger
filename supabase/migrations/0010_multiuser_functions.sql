@@ -86,3 +86,8 @@ $$;
 
 revoke all on function public.get_leaderboard(timestamptz, uuid), public.delete_my_account() from public, anon;
 grant execute on function public.get_leaderboard(timestamptz, uuid), public.delete_my_account() to authenticated;
+
+-- Nur was die Edge Function validate-run braucht.
+grant usage on schema public to service_role;
+grant select, update on public.runs to service_role;
+grant select on public.run_points, public.challenge_config to service_role;
