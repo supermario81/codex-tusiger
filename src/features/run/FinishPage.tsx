@@ -13,9 +13,13 @@ import { playRunFailSound, playRunFanfare } from "../../lib/audio/runAudio";
 import { debugRunEvent } from "../../lib/debug/runDebug";
 
 export function FinishPage() {
-  const { config, userId, t } = useApp();
+  const { config, runs, userId, t } = useApp();
   const runId = localStorage.getItem("tusiger.lastRunId");
   const run = localStore.readRuns(userId).find((item) => item.id === runId);
+  const bestSeconds = Math.min(
+    run?.durationSeconds ?? Infinity,
+    ...runs.filter((item) => item.status === "valid").map((item) => item.durationSeconds)
+  );
   // Erfolgserlebnis für gültige UND zu prüfende Läufe — nur hart ungültige
   // Läufe bekommen den Sorry-Screen.
   const isCelebration = Boolean(run && (run.status === "valid" || run.status === "needs_review"));
@@ -70,7 +74,7 @@ export function FinishPage() {
             <div className={`personal-best ${isReview ? "muted-result" : ""}`}>
               {isReview ? <Clock3 /> : <Trophy />}
               <span>{isReview ? t("Zeit (in Prüfung)", "Time (in review)") : t("Persönliche Bestzeit", "Personal best")}</span>
-              <b>{formatDuration(run.durationSeconds)}</b>
+              <b>{formatDuration(isReview ? run.durationSeconds : bestSeconds)}</b>
             </div>
           ) : (
             <div className="personal-best muted-result">

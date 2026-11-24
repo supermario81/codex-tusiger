@@ -28,7 +28,7 @@ export function ProfilePage() {
     story: "Story",
     settings: "Privacy & settings",
     openDetail: "Open run report",
-    statusLabels: { valid: "Verified", needs_review: "Under review", invalid: "Invalid", draft: "Draft" }
+    statusLabels: { valid: "Valid", needs_review: "In review", invalid: "Invalid", draft: "Draft" }
   } : {
     title: "Profil",
     optimizing: "Avatar wird optimiert...",

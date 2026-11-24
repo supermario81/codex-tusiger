@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 import { MetricCard } from "../../components/ui/MetricCard";
 import { ValidationBadge } from "../../components/ui/StatusBadge";
+import { getAppBaseUrl } from "../../lib/community/community";
 import { formatDuration, formatPace } from "../../lib/geo/geo";
 import { translateCheck } from "../../lib/validation/translateCheck";
 import { localStore } from "../../lib/storage/localStore";
@@ -57,6 +58,21 @@ export function ResultPage() {
 
   function exportLabelsCsv() {
     downloadFile(sensorLog.toLabelsCsv(), `tusiger-labels-${selectedRun.id}.csv`, "text/csv");
+  }
+
+  async function shareReport() {
+    const time = formatDuration(selectedRun.durationSeconds);
+    const text = t(
+      `${selectedRun.estimatedSteps} Stufen in ${time} — mein Tusiger-Lauf.`,
+      `${selectedRun.estimatedSteps} steps in ${time} — my Tusiger run.`
+    );
+    const url = getAppBaseUrl();
+    if (navigator.share) {
+      // Abbruch im Teilen-Dialog ist kein Fehler.
+      await navigator.share({ title: "Tusiger", text, url }).catch(() => undefined);
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, "_blank", "noopener");
+    }
   }
 
   function exportJson() {
@@ -133,7 +149,7 @@ export function ResultPage() {
         </GlassPanel>
         <ValidationBadge status={selectedRun.status} />
         <Link to="/leaderboard"><Button>{t("In Rangliste ansehen", "View in leaderboard")}</Button></Link>
-        <Button variant="secondary" icon={<Share2 />}>{t("Bericht teilen", "Share report")}</Button>
+        <Button variant="secondary" icon={<Share2 />} onClick={() => void shareReport()}>{t("Bericht teilen", "Share report")}</Button>
         <Button variant="glass" icon={<Download />} onClick={exportJson}>{t("JSON exportieren", "Export JSON")}</Button>
         {hasSensorLog ? (
           <>

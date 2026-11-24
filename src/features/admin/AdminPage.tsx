@@ -1,8 +1,7 @@
-import { CheckCircle2, Save, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { PageShell } from "../../components/layout/PageShell";
-import { Button } from "../../components/ui/Button";
 import { GlassPanel } from "../../components/ui/Card";
 
 export function AdminPage() {
@@ -28,7 +27,6 @@ export function AdminPage() {
           <p>Start: {config.startLat}, {config.startLng} · Radius {config.startRadiusM} m</p>
           <p>{t("Ziel", "Finish")}: {config.endLat}, {config.endLng} · Radius {config.endRadiusM} m</p>
           <p>{t("Höhe gültig", "Valid elevation")}: {config.elevationValidMinM}–{config.elevationValidMaxM} m</p>
-          <Button icon={<Save />}>{t("Änderungen speichern", "Save changes")}</Button>
         </GlassPanel>
         <GlassPanel>
           <h2>{t("Runs in Prüfung", "Runs in review")}</h2>
